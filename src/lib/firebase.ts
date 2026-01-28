@@ -32,4 +32,4 @@ try {
     // but allows the app to build without them.
 }
 
-export { auth, db };
+export { auth, db, firebaseConfig };

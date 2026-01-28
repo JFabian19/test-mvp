@@ -1,4 +1,14 @@
-export type Role = 'admin' | 'waiter' | 'kitchen';
+export type Role = 'owner' | 'admin' | 'waiter' | 'kitchen';
+
+export interface Restaurant {
+    id: string;
+    name: string;
+    ownerId: string;
+    createdAt: number;
+    // Settings
+    currency: string;
+    logoUrl?: string;
+}
 
 export interface User {
     uid: string;
