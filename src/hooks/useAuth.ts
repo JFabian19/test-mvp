@@ -21,22 +21,20 @@ export function useAuth() {
                     if (userDoc.exists()) {
                         const userData = userDoc.data() as User;
                         setUser(userData);
+                    } else {
                         // No user document found? Then this user is not properly onboarded.
-                        // Do NOT default to waiter.
                         console.warn("User document not found in Firestore for uid:", firebaseUser.uid);
                         setUser(null);
-                        // Optional: trigger signOut if you want to force them out, 
-                        // but maybe they are in the middle of registration.
-                        // For now, null user means the UI won't show logged-in state or will redirect to login.
-                    } catch (error) {
-                        console.error("Error fetching user profile:", error);
-                        setUser(null);
                     }
-                } else {
+                } catch (error) {
+                    console.error("Error fetching user profile:", error);
                     setUser(null);
                 }
-                setLoading(false);
-            });
+            } else {
+                setUser(null);
+            }
+            setLoading(false);
+        });
 
         return () => unsubscribe();
     }, []);
