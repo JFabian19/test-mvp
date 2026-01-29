@@ -67,7 +67,10 @@ export function MenuManager() {
     const [isSaving, setIsSaving] = useState(false);
 
     const handleSaveScanned = async () => {
-        if (!restaurant) return;
+        if (!restaurant) {
+            alert("Error: No se ha cargado la información del restaurante. Intenta recargar la página.");
+            return;
+        }
         setIsSaving(true);
 
         try {
@@ -99,23 +102,7 @@ export function MenuManager() {
 
     // ... (rest of code) ...
 
-    {
-        scannedItems.length > 0 && (
-            <div className="p-4 border-t border-slate-700 bg-slate-900 sticky bottom-0">
-                <button
-                    onClick={handleSaveScanned}
-                    disabled={isSaving}
-                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-600 text-white font-bold py-3 rounded-xl shadow-lg flex justify-center items-center gap-2 transition-colors"
-                >
-                    {isSaving ? (
-                        <>Guardando...</>
-                    ) : (
-                        <><Save size={20} /> Guardar Todo en el Menú</>
-                    )}
-                </button>
-            </div>
-        )
-    }
+
 
     const handleDelete = async (id: string) => {
         if (confirm('¿Eliminar este producto?')) {
@@ -254,9 +241,14 @@ export function MenuManager() {
                             <div className="p-4 border-t border-slate-700 bg-slate-900 sticky bottom-0">
                                 <button
                                     onClick={handleSaveScanned}
-                                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg flex justify-center items-center gap-2"
+                                    disabled={isSaving}
+                                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-600 text-white font-bold py-3 rounded-xl shadow-lg flex justify-center items-center gap-2 transition-colors"
                                 >
-                                    <Save size={20} /> Guardar Todo en el Menú
+                                    {isSaving ? (
+                                        <>Guardando...</>
+                                    ) : (
+                                        <><Save size={20} /> Guardar Todo en el Menú</>
+                                    )}
                                 </button>
                             </div>
                         )}
