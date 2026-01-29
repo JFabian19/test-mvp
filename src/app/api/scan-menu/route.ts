@@ -28,19 +28,32 @@ export async function POST(req: NextRequest) {
                     role: "user",
                     content: [
                         {
-                            type: "text", text: `Analyze this menu image and extract all food and drink items.
-                        Return ONLY a valid JSON array of objects. Do not include markdown formatting like \`\`\`json.
-                        Each object must have:
-                        - name (string)
-                        - price (number, just the value)
-                        - description (string, or empty if none)
-                        - category (string, guess one of: "Entradas", "Fondos", "Bebidas", "Postres", "Otros")
+                            type: "text", text: `You are an expert Menu Digitizer. Your goal is to extract EVERY food item from this restaurant menu image into a structured JSON.
+
+                            CRITICAL INSTRUCTIONS:
+                            1. **Read carefully**: Look at the entire image. Menus often have multiple columns or sections. Identify them all.
+                            2. **Extract Items**: For each dish/drink, extract:
+                               - "name": The exact name of the dish.
+                               - "price": The numerical price (e.g., if "S/ 25.00", return 25.00). If multiple sizes, pick the main one.
+                               - "description": Any ingredients or description text below the name. Return "" if none.
+                               - "category": Infer the category based on the section header (e.g., "Entradas", "Fondos", "Bebidas", "Postres", "Chifas", "Mariscos", "Otros").
+                            3. **Ignore**: 
+                               - Section headers themselves (don't list "Entradas" as a dish).
+                               - Non-food text like phone numbers, addresses, or "Wi-Fi".
+                            4. **Output Format**: Return ONLY a raw JSON array of objects. No markdown formatting.
                         
-                        Example: [{"name": "Ceviche", "price": 25.0, "description": "Fresco pescado", "category": "Entradas"}]` },
+                            Example Input:
+                            "Lomo Saltado ... S/. 35.00"
+                            "Trozos de carne con cebolla y tomate"
+                            
+                            Example Output:
+                            [{"name": "Lomo Saltado", "price": 35.00, "description": "Trozos de carne con cebolla y tomate", "category": "Fondos"}]`
+                        },
                         {
                             type: "image_url",
                             image_url: {
                                 "url": dataUrl,
+                                "detail": "high" // Force high res analysis
                             },
                         },
                     ],
