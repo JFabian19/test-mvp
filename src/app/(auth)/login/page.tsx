@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
@@ -23,13 +24,32 @@ export default function LoginPage() {
         setError('');
 
         try {
-            await signInWithEmailAndPassword(auth, email, password);
-            // Auth state listener in useAuth will handle fetching role and redirects ideally,
-            // but we can also force a refresh or quick redirect here if we knew the role.
-            // For now, let's just push to a default or wait for the user state to update.
-            // A simple strategy:
-            router.push('/waiter'); // Default landing, will accept for now. 
-            // Better: check role after sign in.
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+
+            // Fetch role to redirect correctly
+            const { doc, getDoc } = await import('firebase/firestore');
+            // Note: Dynamic import or standard import is fine. Using standard if available in scope.
+            // But let's assume we need to import or use the db instance.
+            // db is imported at top.
+
+            const userDoc = await getDoc(doc(db, 'users', user.uid));
+            if (userDoc.exists()) {
+                const userData = userDoc.data();
+                const role = userData.role;
+
+                if (role === 'owner' || role === 'admin') {
+                    router.push('/admin');
+                } else if (role === 'kitchen') {
+                    router.push('/kitchen');
+                } else {
+                    router.push('/waiter');
+                }
+            } else {
+                setError('Usuario no encontrado en la base de datos. Contacta soporte.');
+                await import('firebase/auth').then(({ signOut }) => signOut(auth));
+            }
+
         } catch (err: any) {
             console.error(err);
             setError('Error al iniciar sesión. Verifica tus credenciales.');

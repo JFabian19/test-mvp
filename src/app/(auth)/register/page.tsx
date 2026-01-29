@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { User, Restaurant } from '@/lib/types';
 import Link from 'next/link';
@@ -58,14 +58,62 @@ export default function RegisterPage() {
 
         } catch (err: any) {
             console.error(err);
-            setError(err.message || 'Error al registrar.');
+
+            // Handle "Zombie" account (Auth created, but Firestore failed previously)
+            if (err.code === 'auth/email-already-in-use') {
+                try {
+                    // 1. Try to Login
+                    const { signInWithEmailAndPassword } = await import('firebase/auth');
+                    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                    const user = userCredential.user;
+
+                    // 2. Check if Firestore profile exists
+                    const { doc, getDoc, setDoc, collection } = await import('firebase/firestore');
+                    const userDoc = await getDoc(doc(db, 'users', user.uid));
+
+                    if (!userDoc.exists()) {
+                        // 3. Resume Creation (Recovery Mode)
+                        const restaurantRef = doc(collection(db, 'restaurants'));
+                        const restaurantId = restaurantRef.id;
+
+                        const newRestaurant: Restaurant = {
+                            id: restaurantId,
+                            name: restaurantName,
+                            ownerId: user.uid,
+                            createdAt: Date.now(),
+                            currency: 'PEN',
+                        };
+                        await setDoc(restaurantRef, newRestaurant);
+
+                        const newUserProfile: User = {
+                            uid: user.uid,
+                            email: user.email,
+                            displayName: ownerName,
+                            role: 'owner',
+                            restaurantId: restaurantId
+                        };
+                        await setDoc(doc(db, 'users', user.uid), newUserProfile);
+
+                        router.push('/admin');
+                        return;
+                    } else {
+                        // Account fully exists, just redirect
+                        router.push('/admin');
+                        return;
+                    }
+                } catch (recoveryErr) {
+                    // Password might be wrong or other issue
+                    setError('El correo ya existe. Intenta iniciar sesión o usa otro.');
+                }
+            } else {
+                setError(err.message || 'Error al registrar.');
+            }
         } finally {
             setLoading(false);
         }
     };
 
-    // Need to import collection for auto-id
-    const { collection } = require("firebase/firestore");
+
 
     return (
         <div className="flex items-center justify-center min-h-screen bg-slate-950 text-white p-4">

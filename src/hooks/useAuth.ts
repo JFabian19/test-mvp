@@ -21,27 +21,22 @@ export function useAuth() {
                     if (userDoc.exists()) {
                         const userData = userDoc.data() as User;
                         setUser(userData);
-                    } else {
-                        // Fallback for new users or if doc doesn't exist yet (could auto-create or error)
-                        // For MVP, we might treat them as 'waiter' by default or null
-                        console.warn("User document not found in Firestore");
-                        setUser({
-                            uid: firebaseUser.uid,
-                            email: firebaseUser.email,
-                            displayName: firebaseUser.displayName,
-                            role: 'waiter', // Default fallback for MVP testing
-                            restaurantId: 'demo-restaurant-1'
-                        });
+                        // No user document found? Then this user is not properly onboarded.
+                        // Do NOT default to waiter.
+                        console.warn("User document not found in Firestore for uid:", firebaseUser.uid);
+                        setUser(null);
+                        // Optional: trigger signOut if you want to force them out, 
+                        // but maybe they are in the middle of registration.
+                        // For now, null user means the UI won't show logged-in state or will redirect to login.
+                    } catch (error) {
+                        console.error("Error fetching user profile:", error);
+                        setUser(null);
                     }
-                } catch (error) {
-                    console.error("Error fetching user profile:", error);
+                } else {
                     setUser(null);
                 }
-            } else {
-                setUser(null);
-            }
-            setLoading(false);
-        });
+                setLoading(false);
+            });
 
         return () => unsubscribe();
     }, []);

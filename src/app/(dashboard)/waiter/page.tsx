@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { Table, Product } from '@/lib/types';
 import { TableGrid } from '@/components/waiter/TableGrid';
@@ -11,52 +12,53 @@ import { useStore } from '@/store/useStore';
 import { collection, onSnapshot, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-// Mock Data for fallback
-const MOCK_PRODUCTS: Product[] = [
-    { id: '1', restaurantId: '1', name: 'Pollo a la Brasa (1/4)', price: 18.00, category: 'Fondos', active: true, description: 'Con papas y ensalada' },
-    { id: '2', restaurantId: '1', name: 'Pollo a la Brasa (1/2)', price: 34.00, category: 'Fondos', active: true },
-    { id: '3', restaurantId: '1', name: 'Mostrito', price: 22.00, category: 'Fondos', active: true, description: 'Chaufa + Pollo' },
-    { id: '4', restaurantId: '1', name: 'Inca Kola 1L', price: 12.00, category: 'Bebidas', active: true },
-    { id: '5', restaurantId: '1', name: 'Tequeños', price: 15.00, category: 'Entradas', active: true },
-    { id: '6', restaurantId: '1', name: 'Aeropuerto', price: 24.00, category: 'Fondos', active: true },
-];
-
-const MOCK_TABLES: Table[] = Array.from({ length: 10 }, (_, i) => ({
-    id: `t-${i + 1}`,
-    restaurantId: '1',
-    number: `${i + 1}`,
-    status: 'free'
-}));
-
 export default function WaiterPage() {
-    const { user, logout } = useAuth();
+    const { user, logout, loading } = useAuth();
     const { toggleCart } = useStore();
+    const router = useRouter();
 
-    const [tables, setTables] = useState<Table[]>(MOCK_TABLES);
-    const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
+    const [tables, setTables] = useState<Table[]>([]);
+    const [products, setProducts] = useState<Product[]>([]);
     const [selectedTable, setSelectedTable] = useState<Table | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+    // RBAC Guard
+    useEffect(() => {
+        if (!loading && user) {
+            if (user.role === 'owner' || user.role === 'admin') {
+                router.push('/admin');
+            } else if (user.role === 'kitchen') {
+                router.push('/kitchen');
+            }
+        } else if (!loading && !user) {
+            router.push('/login');
+        }
+    }, [user, loading, router]);
+
     // Firestore listeners
     useEffect(() => {
-        // Listen to Tables
-        // Note: In real app, filter by user.restaurantId
         if (!user?.restaurantId) return;
 
-        const qTables = query(collection(db, 'tables')); // Add filter where('restaurantId', '==', user.restaurantId)
+        // Listen to Tables
+        const qTables = query(
+            collection(db, 'tables'),
+            where('restaurantId', '==', user.restaurantId)
+        );
         const unsubTables = onSnapshot(qTables, (snapshot) => {
             const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Table));
-            if (fetched.length > 0) {
-                setTables(fetched.sort((a, b) => Number(a.number) - Number(b.number)));
-            }
+            setTables(fetched.sort((a, b) => Number(a.number) - Number(b.number)));
         });
 
-        // Fetch Products (Static for now, but could be real-time)
+        // Fetch Products
         const fetchProducts = async () => {
-            const qProd = query(collection(db, 'products'), where('active', '==', true));
+            const qProd = query(
+                collection(db, 'products'),
+                where('active', '==', true),
+                where('restaurantId', '==', user.restaurantId)
+            );
             const snap = await getDocs(qProd);
             const fetchedProds = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-            if (fetchedProds.length > 0) setProducts(fetchedProds);
+            setProducts(fetchedProds);
         };
         fetchProducts();
 
