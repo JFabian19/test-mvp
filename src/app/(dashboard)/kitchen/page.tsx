@@ -15,18 +15,25 @@ export default function KitchenPage() {
     useEffect(() => {
         if (!user?.restaurantId) return;
 
-        // Listen only for pending/cooking orders
-        // Indexes might be needed for compound queries: restaurantId + status + createdAt
+        // Listen for pending/cooking orders
+        // Filter by restaurantId AND status = pending/cooking
+        // Note: Composite queries (equality on restId + IN on status) usually work without custom index,
+        // but adding 'orderBy' often breaks it without an index. We sort client-side to be safe.
         const q = query(
             collection(db, 'orders'),
-            where('status', 'in', ['pending', 'cooking']),
-            // where('restaurantId', '==', user.restaurantId), // Filter by rest ID in real app
-            orderBy('createdAt', 'asc')
+            where('restaurantId', '==', user.restaurantId),
+            where('status', 'in', ['pending', 'cooking'])
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+
+            // Client-side sort: Oldest first
+            fetched.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+
             setOrders(fetched);
+        }, (error) => {
+            console.error("Error fetching kitchen orders:", error);
         });
 
         return () => unsubscribe();

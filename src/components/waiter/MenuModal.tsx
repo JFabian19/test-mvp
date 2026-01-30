@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Product, Category } from '@/lib/types';
+import { useState, useEffect } from 'react';
+import { Product } from '@/lib/types';
 import { X, Plus } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useStore } from '@/store/useStore';
@@ -13,11 +13,25 @@ interface MenuModalProps {
     currentTableId: string | null;
 }
 
-const CATEGORIES: Category[] = ['Entradas', 'Fondos', 'Bebidas', 'Postres', 'Otros'];
-
 export function MenuModal({ isOpen, onClose, products, currentTableId }: MenuModalProps) {
-    const [activeCategory, setActiveCategory] = useState<Category>('Fondos');
+    // Dynamically extract categories from available products
+    // We filter out duplicates and ensure we only show categories that have products
+    const dynamicCategories = Array.from(new Set(products.map(p => p.category))).sort();
+
+    // Fallback if no products
+    const categoriesToShow = dynamicCategories.length > 0 ? dynamicCategories : ['Entradas', 'Fondos', 'Bebidas', 'Postres', 'Otros'];
+
+    const [activeCategory, setActiveCategory] = useState<string>(categoriesToShow[0]);
     const { addToCart, toggleCart } = useStore();
+
+    // Effect to set active category when products load or modal opens
+    useEffect(() => {
+        if (categoriesToShow.length > 0) {
+            setActiveCategory(categoriesToShow[0]);
+        }
+    }, [isOpen, products]);
+    // Note: depending on behavior, we might not want to reset on every product change, 
+    // but for initial load it helps.
 
     if (!isOpen) return null;
 
@@ -43,7 +57,7 @@ export function MenuModal({ isOpen, onClose, products, currentTableId }: MenuMod
 
                 {/* Categories (Horizontal Scroll) */}
                 <div className="flex gap-2 p-4 overflow-x-auto bg-slate-900 border-b border-slate-800 no-scrollbar">
-                    {CATEGORIES.map(cat => (
+                    {categoriesToShow.map(cat => (
                         <button
                             key={cat}
                             onClick={() => setActiveCategory(cat)}
@@ -61,29 +75,35 @@ export function MenuModal({ isOpen, onClose, products, currentTableId }: MenuMod
 
                 {/* Products Grid */}
                 <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 lg:grid-cols-3 gap-4 content-start">
-                    {filteredProducts.map(product => (
-                        <div
-                            key={product.id}
-                            onClick={() => handleAdd(product)}
-                            className="bg-slate-800 p-4 rounded-xl border border-slate-700 active:scale-95 transition-transform flex flex-col justify-between h-40 relative group cursor-pointer hover:border-orange-500/50"
-                        >
-                            <div>
-                                <div className="flex justify-between items-start mb-1">
-                                    <h3 className="font-bold text-slate-200 leading-tight pr-6">{product.name}</h3>
-                                </div>
-                                {product.description && (
-                                    <p className="text-xs text-slate-500 line-clamp-2">{product.description}</p>
-                                )}
-                            </div>
-
-                            <div className="flex justify-between items-end mt-2">
-                                <span className="text-lg font-bold text-orange-400">S/ {product.price.toFixed(2)}</span>
-                                <div className="bg-orange-600/20 text-orange-500 p-2 rounded-full">
-                                    <Plus size={18} />
-                                </div>
-                            </div>
+                    {filteredProducts.length === 0 ? (
+                        <div className="col-span-full py-10 text-center text-slate-500">
+                            <p>No hay productos en esta categoría.</p>
                         </div>
-                    ))}
+                    ) : (
+                        filteredProducts.map(product => (
+                            <div
+                                key={product.id}
+                                onClick={() => handleAdd(product)}
+                                className="bg-slate-800 p-4 rounded-xl border border-slate-700 active:scale-95 transition-transform flex flex-col justify-between h-40 relative group cursor-pointer hover:border-orange-500/50"
+                            >
+                                <div>
+                                    <div className="flex justify-between items-start mb-1">
+                                        <h3 className="font-bold text-slate-200 leading-tight pr-6">{product.name}</h3>
+                                    </div>
+                                    {product.description && (
+                                        <p className="text-xs text-slate-500 line-clamp-2">{product.description}</p>
+                                    )}
+                                </div>
+
+                                <div className="flex justify-between items-end mt-2">
+                                    <span className="text-lg font-bold text-orange-400">S/ {product.price.toFixed(2)}</span>
+                                    <div className="bg-orange-600/20 text-orange-500 p-2 rounded-full">
+                                        <Plus size={18} />
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
 
                 {/* Footer Actions */}
