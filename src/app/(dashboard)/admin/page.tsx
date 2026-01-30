@@ -7,8 +7,9 @@ import { TableGrid } from '@/components/waiter/TableGrid';
 import { PaymentModal } from '@/components/admin/PaymentModal';
 import { StaffManager } from '@/components/admin/StaffManager';
 import { MenuManager } from '@/components/admin/MenuManager';
+import { TableSetup } from '@/components/admin/TableSetup';
 import { LogOut, LayoutDashboard, Users, Utensils, BarChart3, Grid } from 'lucide-react';
-import { collection, onSnapshot, query, doc, getDoc, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, doc, getDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Table, Order } from '@/lib/types';
 
@@ -23,11 +24,13 @@ export default function AdminPage() {
     const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
     const [isPaymentOpen, setIsPaymentOpen] = useState(false);
 
-    // Fetch Tables (Only when in 'tables' tab or always? Always is safer for realtime needs)
+    // Table Configuration State
+    const [isEditingTables, setIsEditingTables] = useState(false);
+
+    // Fetch Tables
     useEffect(() => {
         if (!user?.restaurantId) return;
 
-        // Ensure we filter by restaurantId
         const q = query(
             collection(db, 'tables'),
             where('restaurantId', '==', user.restaurantId)
@@ -54,7 +57,49 @@ export default function AdminPage() {
             }
         } else {
             // Logic to Edit Table Settings / QR Code could go here
-            alert(`Mesa ${table.number} está libre.`);
+            // For now, no action
+        }
+    };
+
+    const handleUpdateTableCount = async (count: number) => {
+        if (!user?.restaurantId) return;
+
+        try {
+            const batch = writeBatch(db);
+            const currentCount = tables.length;
+
+            // 1. Create new tables if needed
+            if (count > currentCount) {
+                const existingNumbers = new Set(tables.map(t => parseInt(t.number)));
+
+                for (let i = 1; i <= count; i++) {
+                    if (!existingNumbers.has(i)) {
+                        const newTableRef = doc(collection(db, 'tables'));
+                        batch.set(newTableRef, {
+                            restaurantId: user.restaurantId,
+                            number: i.toString(),
+                            status: 'free',
+                            seats: 4 // Default
+                        });
+                    }
+                }
+            }
+
+            // 2. Remove tables if count < current
+            if (count < currentCount) {
+                const tablesToDelete = tables
+                    .filter(t => parseInt(t.number) > count);
+
+                tablesToDelete.forEach(t => {
+                    batch.delete(doc(db, 'tables', t.id));
+                });
+            }
+
+            await batch.commit();
+            setIsEditingTables(false);
+        } catch (error) {
+            console.error("Error updating tables:", error);
+            alert("Error al actualizar las mesas. Revisa la consola.");
         }
     };
 
@@ -119,12 +164,29 @@ export default function AdminPage() {
                         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                             <div className="flex justify-between items-center mb-4">
                                 <h2 className="text-xl font-bold text-white">Estado del Salón</h2>
-                                {/* Possible "Add Table" button here in future */}
+                                <button
+                                    onClick={() => setIsEditingTables(true)}
+                                    className="text-sm text-blue-400 hover:text-blue-300 underline"
+                                >
+                                    {tables.length > 0 ? 'Configurar Mesas' : ''}
+                                </button>
                             </div>
-                            {tables.length === 0 ? (
-                                <div className="text-center py-20 text-slate-500">
-                                    <p>No tienes mesas configuradas.</p>
-                                    <button className="text-blue-500 underline mt-2">Crear Mesas (Demo)</button>
+
+                            {isEditingTables ? (
+                                <TableSetup
+                                    currentCount={tables.length}
+                                    onSave={handleUpdateTableCount}
+                                    onCancel={() => setIsEditingTables(false)}
+                                />
+                            ) : tables.length === 0 ? (
+                                <div className="text-center py-20 text-slate-500 bg-slate-900/50 rounded-xl border border-dashed border-slate-800">
+                                    <p className="mb-4">No tienes mesas configuradas.</p>
+                                    <button
+                                        onClick={() => setIsEditingTables(true)}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition"
+                                    >
+                                        Crear Mesas
+                                    </button>
                                 </div>
                             ) : (
                                 <TableGrid tables={tables} onSelectTable={handleTableSelect} />
