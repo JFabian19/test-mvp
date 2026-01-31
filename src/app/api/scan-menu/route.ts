@@ -39,7 +39,8 @@ export async function POST(req: NextRequest) {
                        - "description": Description or ingredients.
                        - "category": Infer category (Entradas, Fondos, etc.).
                     3. **Ignore**: Headers, contact info, wifi.
-                    4. **Output**: raw JSON array.`
+                    3. **Ignore**: Headers, contact info, wifi.
+                    4. **Output**: ONLY a valid JSON array. Double check syntax. No markdown code blocks.`
                 },
                 {
                     type: "image_url",
@@ -112,12 +113,21 @@ export async function POST(req: NextRequest) {
             model: "gpt-4o-mini",
             messages: [{ role: "user", content: promptContent }],
             max_tokens: 2000,
+            temperature: 0.1, // Lower temperature for more deterministic output
         });
 
         const textOutput = response.choices[0]?.message?.content?.trim() || "[]";
 
-        // Clean potential markdown blocks just in case
-        const cleanJson = textOutput.replace(/```json/g, '').replace(/```/g, '').trim();
+        // Robust JSON extraction: Find the first '[' and last ']'
+        const start = textOutput.indexOf('[');
+        const end = textOutput.lastIndexOf(']');
+
+        if (start === -1 || end === -1) {
+            console.error("No JSON array found in response:", textOutput);
+            return NextResponse.json({ error: 'AI did not return a valid menu list', raw: textOutput }, { status: 500 });
+        }
+
+        const cleanJson = textOutput.substring(start, end + 1);
 
         try {
             const data = JSON.parse(cleanJson);
