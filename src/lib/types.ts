@@ -37,15 +37,20 @@ export interface CartItem extends Product {
     note?: string;
 }
 
-export type OrderStatus = 'pending' | 'cooking' | 'ready' | 'delivered';
+export type OrderStatus = 'pending' | 'cooking' | 'ready' | 'delivered' | 'completed';
+
+export type ItemStatus = 'pending' | 'cooking' | 'ready' | 'delivered';
 
 export interface OrderItem {
+    id: string; // Unique ID for the item within the order
     productId: string;
     name: string;
     price: number;
     quantity: number;
     note?: string;
+    status: ItemStatus; // Individual item status
 }
+
 
 export interface Order {
     id: string;

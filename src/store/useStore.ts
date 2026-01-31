@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { CartItem, Product } from '@/lib/types';
-import { v4 as uuidv4 } from 'uuid'; // You might need to install uuid or just use crypto
 
 interface AppState {
     // Global
@@ -19,9 +18,6 @@ interface AppState {
     toggleCart: () => void;
 }
 
-// Simple unique ID generator if uuid is not installed
-const generateId = () => Math.random().toString(36).substr(2, 9);
-
 export const useStore = create<AppState>((set) => ({
     restaurantId: 'demo-restaurant-1', // Default for MVP
     setRestaurantId: (id) => set({ restaurantId: id }),
@@ -34,9 +30,10 @@ export const useStore = create<AppState>((set) => ({
         // For MVP, simplistic: Always add new line item to allow specific notes per item.
         const newItem: CartItem = {
             ...product,
-            cartId: generateId(),
+            cartId: crypto.randomUUID(),
             quantity: 1, // Default to 1
-            note: ''
+            note: '',
+            // These will be mapped to OrderItem later, but good to have structure
         };
         return { cart: [...state.cart, newItem] };
     }),

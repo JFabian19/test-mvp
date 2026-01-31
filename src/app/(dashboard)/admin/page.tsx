@@ -8,10 +8,12 @@ import { PaymentModal } from '@/components/admin/PaymentModal';
 import { StaffManager } from '@/components/admin/StaffManager';
 import { MenuManager } from '@/components/admin/MenuManager';
 import { TableSetup } from '@/components/admin/TableSetup';
+import { SalesReports } from '@/components/admin/SalesReports';
 import { LogOut, LayoutDashboard, Users, Utensils, BarChart3, Grid } from 'lucide-react';
 import { collection, onSnapshot, query, doc, getDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Table, Order } from '@/lib/types';
+import { toast } from 'sonner';
 
 export default function AdminPage() {
     const { user, logout } = useAuth();
@@ -97,9 +99,10 @@ export default function AdminPage() {
 
             await batch.commit();
             setIsEditingTables(false);
+            toast.success('Mesas actualizadas exitosamente');
         } catch (error) {
             console.error("Error updating tables:", error);
-            alert("Error al actualizar las mesas. Revisa la consola.");
+            toast.error("Error al actualizar las mesas");
         }
     };
 
@@ -207,10 +210,8 @@ export default function AdminPage() {
                     )}
 
                     {activeTab === 'reports' && (
-                        <div className="flex flex-col items-center justify-center py-20 text-slate-500 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            <BarChart3 size={48} className="mb-4 opacity-50" />
-                            <h3 className="text-lg font-medium text-slate-300 mb-2">Reportes y Métricas</h3>
-                            <p>Visualiza tus ventas diarias y platos más vendidos.</p>
+                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <SalesReports />
                         </div>
                     )}
                 </div>

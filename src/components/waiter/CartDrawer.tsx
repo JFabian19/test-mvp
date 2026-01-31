@@ -1,72 +1,119 @@
 'use client';
 
 import { useStore } from '@/store/useStore';
-import { X, Trash2, Send, MessageSquare } from 'lucide-react';
+import { X, Trash2, Send, MessageSquare, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
-import { addDoc, collection, serverTimestamp, updateDoc, doc } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Order, OrderStatus } from '@/lib/types';
+import { Order, Table } from '@/lib/types';
+import { toast } from 'sonner';
 
 interface CartDrawerProps {
-    currentTable: { id: string; number: string; restaurantId: string } | null;
+    currentTable: Table | null;
 }
 
 export function CartDrawer({ currentTable }: CartDrawerProps) {
     const { cart, removeFromCart, updateCartItemNote, clearCart, isCartOpen, toggleCart } = useStore();
     const [sending, setSending] = useState(false);
+    const [isConfirming, setIsConfirming] = useState(false);
 
     if (!isCartOpen) return null;
 
     const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
-    const handleSendOrder = async () => {
+    const handleSendClick = () => {
         if (!currentTable || cart.length === 0) return;
+        setIsConfirming(true);
+    };
+
+    const handleConfirmSend = async () => {
+        setIsConfirming(false);
         setSending(true);
 
         try {
-            // Create Order
-            const newOrder: Omit<Order, 'id'> = {
-                restaurantId: currentTable.restaurantId,
-                tableId: currentTable.id,
-                tableNumber: currentTable.number,
-                items: cart.map(item => ({
-                    productId: item.id,
-                    name: item.name,
-                    price: item.price,
-                    quantity: item.quantity,
-                    note: item.note
-                })),
-                status: 'pending',
-                total: total,
-                createdAt: Date.now(), // Use serverTimestamp() in real app mostly, but simplified types for now
-                updatedAt: Date.now(),
-            };
+            if (currentTable?.currentOrderId) {
+                // Fetch current order to update it
+                const orderRef = doc(db, 'orders', currentTable.currentOrderId);
+                const orderSnap = await getDoc(orderRef);
 
-            const orderRef = await addDoc(collection(db, 'orders'), {
-                ...newOrder,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            });
+                if (orderSnap.exists()) {
+                    const currentOrder = orderSnap.data() as Order;
 
-            // Update Table Status
-            await updateDoc(doc(db, 'tables', currentTable.id), {
-                status: 'occupied',
-                currentOrderId: orderRef.id
-            });
+                    const newItems = cart.map(item => ({
+                        id: crypto.randomUUID(),
+                        productId: item.id,
+                        name: item.name,
+                        price: item.price,
+                        quantity: item.quantity,
+                        note: item.note,
+                        status: 'pending' as const
+                    }));
+
+                    const updatedItems = [...currentOrder.items, ...newItems];
+                    const newTotal = updatedItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+
+                    await updateDoc(orderRef, {
+                        items: updatedItems,
+                        total: newTotal,
+                        updatedAt: Date.now(),
+                        status: currentOrder.status === 'delivered' ? 'pending' : currentOrder.status
+                    });
+
+                    toast.success('Items agregados a la orden');
+                } else {
+                    await createNewOrder();
+                }
+            } else {
+                await createNewOrder();
+            }
 
             clearCart();
-            toggleCart(); // Close
-            alert('Pedido enviado a cocina!'); // Simple feedback
+            toggleCart();
         } catch (error) {
             console.error("Error sending order:", error);
-            alert('Error al enviar pedido');
+            toast.error('Error al enviar pedido');
         } finally {
             setSending(false);
         }
     };
 
+    const createNewOrder = async () => {
+        if (!currentTable) return;
+
+        const newOrder = {
+            restaurantId: currentTable.restaurantId,
+            tableId: currentTable.id,
+            tableNumber: currentTable.number,
+            items: cart.map(item => ({
+                id: crypto.randomUUID(),
+                productId: item.id,
+                name: item.name,
+                price: item.price,
+                quantity: item.quantity,
+                note: item.note,
+                status: 'pending' as const
+            })),
+            status: 'pending' as const,
+            total: total,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+        };
+
+        const orderRef = await addDoc(collection(db, 'orders'), {
+            ...newOrder,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        });
+
+        await updateDoc(doc(db, 'tables', currentTable.id), {
+            status: 'occupied',
+            currentOrderId: orderRef.id
+        });
+        toast.success('Nuevo pedido creado');
+    };
+
     return (
-        <div className="fixed inset-y-0 right-0 z-50 w-full md:w-96 bg-slate-900 shadow-2xl border-l border-slate-700 flex flex-col transform transition-transform">
+        <div className="fixed inset-y-0 right-0 z-[60] w-full md:w-96 bg-slate-900 shadow-2xl border-l border-slate-700 flex flex-col transform transition-transform">
             <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800">
                 <div>
                     <h2 className="text-xl font-bold text-white">Pedido actual</h2>
@@ -100,6 +147,7 @@ export function CartDrawer({ currentTable }: CartDrawerProps) {
                                     value={item.note || ''}
                                     onChange={(e) => updateCartItemNote(item.cartId, e.target.value)}
                                     className="bg-transparent border-b border-slate-600 text-sm text-slate-300 w-full focus:border-orange-500 outline-none placeholder:text-slate-600"
+                                    autoFocus // Suggest focusing on notes when added? Maybe annoying. Remove if so.
                                 />
                             </div>
 
@@ -107,6 +155,7 @@ export function CartDrawer({ currentTable }: CartDrawerProps) {
                                 <button
                                     onClick={() => removeFromCart(item.cartId)}
                                     className="text-red-400 hover:text-red-300 p-1"
+                                    title="Quitar"
                                 >
                                     <Trash2 size={18} />
                                 </button>
@@ -116,18 +165,47 @@ export function CartDrawer({ currentTable }: CartDrawerProps) {
                 )}
             </div>
 
-            <div className="p-4 bg-slate-800 border-t border-slate-700">
+            <div className="p-4 bg-slate-800 border-t border-slate-700 relative">
                 <div className="flex justify-between items-center mb-4 text-xl font-bold">
                     <span className="text-slate-300">Total</span>
                     <span className="text-white">S/ {total.toFixed(2)}</span>
                 </div>
                 <button
-                    onClick={handleSendOrder}
+                    onClick={handleSendClick}
                     disabled={cart.length === 0 || sending || !currentTable}
                     className="w-full bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
                 >
                     {sending ? 'Enviando...' : <><Send size={20} /> Enviar a Cocina</>}
                 </button>
+
+                {/* Confirm Overlay */}
+                {isConfirming && (
+                    <div className="absolute inset-x-0 bottom-0 bg-slate-900 border-t border-slate-700 p-6 animate-in slide-in-from-bottom duration-200 z-10 rounded-t-2xl shadow-2xl">
+                        <div className="flex flex-col items-center text-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500 mb-1">
+                                <AlertCircle size={24} />
+                            </div>
+                            <h3 className="font-bold text-white text-lg">¿Confirmar Pedido?</h3>
+                            <p className="text-slate-400 text-sm mb-2">
+                                Se enviarán {cart.length} items a cocina por <span className="text-white font-bold">S/ {total.toFixed(2)}</span>
+                            </p>
+                            <div className="flex gap-3 w-full">
+                                <button
+                                    onClick={() => setIsConfirming(false)}
+                                    className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium transition"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleConfirmSend}
+                                    className="flex-1 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-bold shadow-lg shadow-orange-900/20 active:scale-[0.98]"
+                                >
+                                    Sí, Enviar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

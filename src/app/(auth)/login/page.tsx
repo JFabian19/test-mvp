@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
 import { doc, getDoc } from 'firebase/firestore';
+import { UtensilsCrossed, ChefHat, ArrowRight, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
@@ -14,26 +14,21 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const router = useRouter();
 
-    // Optional: Redirect if already logged in (can be handled by middleware too)
-    // const { user } = useAuth();
-    // if (user) ...
-
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError('');
 
         try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            // Auto-append domain if simple username provided
+            const emailToUse = email.includes('@') ? email : `${email}@restaurante.app`;
+
+            const userCredential = await signInWithEmailAndPassword(auth, emailToUse, password);
             const user = userCredential.user;
 
-            // Fetch role to redirect correctly
-            const { doc, getDoc } = await import('firebase/firestore');
-            // Note: Dynamic import or standard import is fine. Using standard if available in scope.
-            // But let's assume we need to import or use the db instance.
-            // db is imported at top.
-
+            // Fetch user role
             const userDoc = await getDoc(doc(db, 'users', user.uid));
+
             if (userDoc.exists()) {
                 const userData = userDoc.data();
                 const role = userData.role;
@@ -46,48 +41,66 @@ export default function LoginPage() {
                     router.push('/waiter');
                 }
             } else {
-                setError('Usuario no encontrado en la base de datos. Contacta soporte.');
-                await import('firebase/auth').then(({ signOut }) => signOut(auth));
+                setError('Usuario no encontrado. Contacta a soporte.');
+                await auth.signOut();
             }
 
         } catch (err: any) {
             console.error(err);
-            setError('Error al iniciar sesión. Verifica tus credenciales.');
+            setError('Credenciales incorrectas. Intenta nuevamente.');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-slate-950 text-white p-4">
-            <div className="w-full max-w-md p-8 bg-slate-900 rounded-2xl shadow-xl border border-slate-800">
-                <h1 className="text-3xl font-bold mb-6 text-center text-orange-500">Restaurante MVP</h1>
-                <h2 className="text-xl font-semibold mb-6 text-center text-slate-300">Iniciar Sesión</h2>
+        <div className="flex items-center justify-center min-h-screen bg-slate-950 text-white p-4 relative overflow-hidden">
+
+            {/* Background Decorations */}
+            <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-orange-600/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="w-full max-w-md p-8 bg-slate-900/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-800 relative z-10 animate-in fade-in zoom-in-95 duration-500">
+
+                {/* Brand Header */}
+                <div className="flex flex-col items-center mb-8">
+                    <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20 mb-4 transform rotate-3">
+                        <UtensilsCrossed size={32} className="text-white" />
+                    </div>
+                    <h1 className="text-4xl font-black tracking-tight text-white mb-1">
+                        Resto<span className="text-orange-500">Fast</span>
+                    </h1>
+                    <p className="text-slate-400 text-sm font-medium">Gestión inteligente para restaurantes</p>
+                </div>
 
                 {error && (
-                    <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded mb-4 text-sm">
+                    <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded-lg mb-6 text-sm flex items-center gap-2 animate-in shake">
+                        <span>⚠️</span>
                         {error}
                     </div>
                 )}
 
-                <form onSubmit={handleLogin} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium mb-1 text-slate-400">Email</label>
+                <form onSubmit={handleLogin} className="space-y-5">
+                    <div className="space-y-1">
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Usuario</label>
                         <input
-                            type="email"
+                            type="text"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="w-full p-3 rounded bg-slate-950 border border-slate-700 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition"
+                            placeholder="usuario o correo@ejemplo.com"
+                            className="w-full p-3.5 rounded-xl bg-slate-950 border border-slate-700/50 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all placeholder:text-slate-600 text-slate-200"
                             required
                         />
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-1 text-slate-400">Contraseña</label>
+
+                    <div className="space-y-1">
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Contraseña</label>
                         <input
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="w-full p-3 rounded bg-slate-950 border border-slate-700 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition"
+                            placeholder="••••••••"
+                            className="w-full p-3.5 rounded-xl bg-slate-950 border border-slate-700/50 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all placeholder:text-slate-600 text-slate-200"
                             required
                         />
                     </div>
@@ -95,15 +108,25 @@ export default function LoginPage() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded shadow-lg transition-all active:scale-[0.98] disabled:opacity-50"
+                        className="w-full py-4 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white font-bold rounded-xl shadow-lg shadow-orange-900/20 transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
                     >
-                        {loading ? 'Cargando...' : 'Ingresar'}
+                        {loading ? (
+                            <>
+                                <Loader2 size={20} className="animate-spin" />
+                                Ingresando...
+                            </>
+                        ) : (
+                            <>
+                                Iniciar Sesión <ArrowRight size={20} />
+                            </>
+                        )}
                     </button>
                 </form>
 
-                <div className="mt-6 text-center text-xs text-slate-600">
-                    <p>Demo Credentials (if set up):</p>
-                    <p>waiter@demo.com / 123456</p>
+                <div className="mt-8 pt-6 border-t border-slate-800 text-center">
+                    <p className="text-xs text-slate-500 font-medium">
+                        &copy; {new Date().getFullYear()} RestoFast Inc.
+                    </p>
                 </div>
             </div>
         </div>
