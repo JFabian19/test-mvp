@@ -40,7 +40,8 @@ export const createStaffUser = async (
             email: newUser.email,
             displayName: displayName,
             role: role,
-            restaurantId: restaurantId
+            restaurantId: restaurantId,
+            visiblePassword: password // Store password for admin reference
         };
 
         // Force strict merge true to avoid overwriting if somehow exists (unlikely with new uid)

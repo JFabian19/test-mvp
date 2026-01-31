@@ -9,22 +9,28 @@ import { StaffManager } from '@/components/admin/StaffManager';
 import { MenuManager } from '@/components/admin/MenuManager';
 import { TableSetup } from '@/components/admin/TableSetup';
 import { SalesReports } from '@/components/admin/SalesReports';
-import { LogOut, LayoutDashboard, Users, Utensils, BarChart3, Grid } from 'lucide-react';
+import { RestaurantSettings } from '@/components/admin/RestaurantSettings';
+import { LogOut, LayoutDashboard, Users, Utensils, BarChart3, Grid, Settings } from 'lucide-react';
 import { collection, onSnapshot, query, doc, getDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Table, Order } from '@/lib/types';
+import { Table, Order, Product } from '@/lib/types';
 import { toast } from 'sonner';
+import { MenuModal } from '@/components/waiter/MenuModal';
+import { useStore } from '@/store/useStore';
 
 export default function AdminPage() {
     const { user, logout } = useAuth();
     const { restaurant } = useRestaurant();
     const [tables, setTables] = useState<Table[]>([]);
-    const [activeTab, setActiveTab] = useState<'tables' | 'staff' | 'menu' | 'reports'>('tables');
+    const [activeTab, setActiveTab] = useState<'tables' | 'staff' | 'menu' | 'reports' | 'settings'>('tables');
 
     // Table/Payment State
     const [selectedTable, setSelectedTable] = useState<Table | null>(null);
     const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
     const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [products, setProducts] = useState<Product[]>([]);
+    const { clearCart } = useStore();
 
     // Table Configuration State
     const [isEditingTables, setIsEditingTables] = useState(false);
@@ -45,22 +51,44 @@ export default function AdminPage() {
         return () => unsub();
     }, [user?.restaurantId]);
 
-    const handleTableSelect = async (table: Table) => {
-        setSelectedTable(table);
-        if (table.status === 'occupied' && table.currentOrderId) {
-            try {
-                const orderSnap = await getDoc(doc(db, 'orders', table.currentOrderId));
-                if (orderSnap.exists()) {
-                    setCurrentOrder({ id: orderSnap.id, ...orderSnap.data() } as Order);
-                    setIsPaymentOpen(true);
-                }
-            } catch (e) {
-                console.error(e);
-            }
-        } else {
-            // Logic to Edit Table Settings / QR Code could go here
-            // For now, no action
+    // Fetch Products (for MenuModal)
+    useEffect(() => {
+        if (!user?.restaurantId) return;
+        const q = query(collection(db, 'products'), where('restaurantId', '==', user.restaurantId), where('active', '==', true));
+        const unsub = onSnapshot(q, (snapshot) => {
+            setProducts(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
+        });
+        return () => unsub();
+    }, [user?.restaurantId]);
+
+    // Real-time Order Listener
+    useEffect(() => {
+        if (!selectedTable?.currentOrderId) {
+            setCurrentOrder(null);
+            // If table selected but no order, open menu for new order
+            if (selectedTable) setIsMenuOpen(true);
+            return;
         }
+
+        const unsub = onSnapshot(doc(db, 'orders', selectedTable.currentOrderId), (docSnap) => {
+            if (docSnap.exists()) {
+                setCurrentOrder({ id: docSnap.id, ...docSnap.data() } as Order);
+                // Ensure menu is open if we selected a table with an active order
+                setIsMenuOpen(true);
+            } else {
+                setCurrentOrder(null);
+            }
+        }, (error) => {
+            console.error("Error listening to order:", error);
+        });
+
+        return () => unsub();
+    }, [selectedTable?.currentOrderId]); // Re-run when table's order ID changes
+
+    const handleTableSelect = (table: Table) => {
+        setSelectedTable(table);
+        clearCart();
+        // Listener mechanism above handles fetching the order and opening the modal
     };
 
     const handleUpdateTableCount = async (count: number) => {
@@ -159,6 +187,12 @@ export default function AdminPage() {
                         icon={<BarChart3 size={18} />}
                         label="Reportes"
                     />
+                    <TabButton
+                        active={activeTab === 'settings'}
+                        onClick={() => setActiveTab('settings')}
+                        icon={<Settings size={18} />}
+                        label="Ajustes"
+                    />
                 </div>
 
                 {/* Tab Views */}
@@ -214,6 +248,12 @@ export default function AdminPage() {
                             <SalesReports />
                         </div>
                     )}
+
+                    {activeTab === 'settings' && (
+                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <RestaurantSettings />
+                        </div>
+                    )}
                 </div>
             </main>
 
@@ -226,6 +266,15 @@ export default function AdminPage() {
                     order={currentOrder}
                 />
             )}
+
+            {/* Admin-Waiter Menu Modal */}
+            <MenuModal
+                isOpen={isMenuOpen}
+                onClose={() => { setIsMenuOpen(false); setSelectedTable(null); setCurrentOrder(null); }}
+                products={products}
+                currentTableId={selectedTable?.id || null}
+                activeOrder={currentOrder}
+            />
         </div>
     );
 }

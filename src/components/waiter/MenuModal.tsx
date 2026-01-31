@@ -33,6 +33,8 @@ export function MenuModal({ isOpen, onClose, products, currentTableId, activeOrd
 
     // Confirmation State
     const [itemToDelete, setItemToDelete] = useState<{ id: string, name: string } | null>(null);
+    const [mobileTab, setMobileTab] = useState<'menu' | 'order'>('menu');
+    const [addedItemId, setAddedItemId] = useState<string | null>(null);
 
     // Categories
     const dynamicCategories = Array.from(new Set(products.map(p => p.category))).sort();
@@ -64,7 +66,8 @@ export function MenuModal({ isOpen, onClose, products, currentTableId, activeOrd
                 price: item.price,
                 quantity: item.quantity,
                 note: item.note,
-                status: 'pending' as ItemStatus
+                status: 'pending' as ItemStatus,
+                category: item.category
             }));
 
             if (activeOrder) {
@@ -155,20 +158,47 @@ export function MenuModal({ isOpen, onClose, products, currentTableId, activeOrd
         }
     };
 
+    const handleAddToCart = (product: Product) => {
+        addToCart(product);
+        setAddedItemId(product.id);
+
+        // Mobile vibration feedback
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate(50);
+        }
+
+        setTimeout(() => setAddedItemId(null), 800);
+    };
+
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in zoom-in duration-300">
-            <div className="bg-slate-900 w-full max-w-7xl h-[90vh] rounded-2xl flex overflow-hidden border border-slate-700 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-0 md:p-4 animate-in fade-in zoom-in duration-300">
+            <div className="bg-slate-900 w-full md:max-w-7xl h-full md:h-[90vh] md:rounded-2xl flex overflow-hidden border border-slate-700 shadow-2xl relative">
 
                 {/* LEFT: Menu Grid (65%) */}
-                <div className="w-[65%] flex flex-col border-r border-slate-700">
+                <div className={clsx(
+                    "flex flex-col border-r border-slate-700 transition-all",
+                    mobileTab === 'menu' ? "w-full flex" : "hidden md:flex md:w-[65%]",
+                    "md:w-[65%]"
+                )}>
                     {/* Header */}
-                    <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/50 backdrop-blur">
-                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                            <span className="text-orange-500">📖</span> Carta
-                        </h2>
+                    <div className="p-4 border-b border-slate-700 flex flex-col md:flex-row md:justify-between md:items-center gap-4 bg-slate-800/50 backdrop-blur">
+
+                        {/* Title & Mobile Close */}
+                        <div className="w-full md:w-auto flex justify-between items-center">
+                            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                <span className="text-orange-500">📖</span> Carta
+                            </h2>
+                            <button
+                                onClick={onClose}
+                                className="md:hidden bg-red-500/10 text-red-500 p-2 rounded-full hover:bg-red-500 hover:text-white transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
                         {/* Categories */}
-                        <div className="flex gap-2 overflow-x-auto no-scrollbar max-w-lg">
+                        <div className="w-full md:w-auto flex gap-2 overflow-x-auto no-scrollbar md:max-w-lg pb-1 md:pb-0">
                             {categoriesToShow.map(cat => (
                                 <button
                                     key={cat}
@@ -188,35 +218,79 @@ export function MenuModal({ isOpen, onClose, products, currentTableId, activeOrd
 
                     {/* Products */}
                     <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 md:grid-cols-3 gap-4 content-start bg-slate-900/50">
-                        {filteredProducts.map(product => (
-                            <div
-                                key={product.id}
-                                onClick={() => addToCart(product)}
-                                className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/50 hover:border-orange-500 hover:bg-slate-800 transition-all cursor-pointer group flex flex-col justify-between min-h-[140px]"
-                            >
-                                <div>
-                                    <h3 className="font-bold text-slate-200 text-sm leading-tight mb-1">{product.name}</h3>
-                                    <p className="text-[10px] text-slate-500 line-clamp-2">{product.description}</p>
-                                </div>
-                                <div className="flex justify-between items-center mt-2">
-                                    <span className="text-orange-400 font-bold block">S/{product.price.toFixed(2)}</span>
-                                    <div className="bg-orange-500/10 text-orange-500 p-1.5 rounded-lg group-hover:bg-orange-500 group-hover:text-white transition-colors">
-                                        <Plus size={14} />
+                        {filteredProducts.map(product => {
+                            const isAdded = addedItemId === product.id;
+                            return (
+                                <div
+                                    key={product.id}
+                                    onClick={() => handleAddToCart(product)}
+                                    className={clsx(
+                                        "relative overflow-hidden p-3 rounded-xl border transition-all cursor-pointer group flex flex-col justify-between min-h-[140px]",
+                                        isAdded
+                                            ? "bg-emerald-900/30 border-emerald-500 scale-95 ring-2 ring-emerald-500/50"
+                                            : "bg-slate-800/80 border-slate-700/50 hover:border-orange-500 hover:bg-slate-800"
+                                    )}
+                                >
+                                    {/* Success Overlay */}
+                                    {isAdded && (
+                                        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-200">
+                                            <div className="bg-emerald-500 text-white p-3 rounded-full shadow-xl animate-in zoom-in spin-in-12 duration-300">
+                                                <CheckCircle size={28} strokeWidth={3} />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div>
+                                        <h3 className="font-bold text-slate-200 text-sm leading-tight mb-1">{product.name}</h3>
+                                        <p className="text-[10px] text-slate-500 line-clamp-2">{product.description}</p>
+                                    </div>
+                                    <div className="flex justify-between items-center mt-2">
+                                        <span className={clsx("font-bold block transition-colors", isAdded ? "text-emerald-400" : "text-orange-400")}>
+                                            S/{product.price.toFixed(2)}
+                                        </span>
+                                        <div className={clsx(
+                                            "p-1.5 rounded-lg transition-colors",
+                                            isAdded ? "bg-emerald-500 text-white" : "bg-orange-500/10 text-orange-500 group-hover:bg-orange-500 group-hover:text-white"
+                                        )}>
+                                            {isAdded ? <CheckCircle size={14} /> : <Plus size={14} />}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            )
+                        })}
                     </div>
                 </div>
 
+                {/* Mobile Floating Button to View Order */}
+                <div className="md:hidden absolute bottom-4 left-0 right-0 px-4 flex justify-center pointer-events-none">
+                    <button
+                        onClick={() => setMobileTab('order')}
+                        className="bg-orange-600 text-white font-bold py-3 px-6 rounded-full shadow-lg shadow-orange-900/50 flex items-center gap-3 hover:scale-105 transition-transform pointer-events-auto"
+                    >
+                        <span>Ver Pedido</span>
+                        <span className="bg-white/20 px-2 py-0.5 rounded text-sm">
+                            S/ {finalTotal.toFixed(2)}
+                        </span>
+                    </button>
+                </div>
+
                 {/* RIGHT: Order Summary (35%) */}
-                <div className="w-[35%] flex flex-col bg-slate-950/50 relative">
+                <div className={clsx(
+                    "flex flex-col bg-slate-950/50 relative transition-all",
+                    mobileTab === 'order' ? "w-full flex" : "hidden md:flex md:w-[35%]",
+                    "md:w-[35%]"
+                )}>
                     <button onClick={onClose} className="absolute top-4 right-4 z-10 text-slate-500 hover:text-white bg-slate-800/50 p-1 rounded-full">
                         <X size={20} />
                     </button>
 
                     <div className="p-6 border-b border-slate-800">
-                        <h2 className="text-2xl font-bold text-white mb-1">Mesa {activeOrder?.tableNumber || '...'}</h2>
+                        <div className="flex items-center gap-2 mb-1">
+                            <button onClick={() => setMobileTab('menu')} className="md:hidden text-slate-400 mr-2">
+                                <span className="text-xl">←</span>
+                            </button>
+                            <h2 className="text-2xl font-bold text-white">Mesa {activeOrder?.tableNumber || '...'}</h2>
+                        </div>
                         <div className="flex items-center gap-2 text-sm text-slate-400">
                             <Clock size={14} />
                             <span>{activeOrder ? 'Orden Activa' : 'Nueva Orden'}</span>
@@ -361,36 +435,38 @@ export function MenuModal({ isOpen, onClose, products, currentTableId, activeOrd
             />
 
             {/* Confirm Delete Modal */}
-            {itemToDelete && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                    <div className="bg-slate-900 w-full max-w-sm rounded-2xl border border-slate-700 shadow-2xl p-6 animate-in zoom-in-95 duration-200">
-                        <div className="flex flex-col items-center text-center gap-4">
-                            <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 mb-2">
-                                <AlertTriangle size={24} />
-                            </div>
-                            <h3 className="text-xl font-bold text-white">¿Eliminar Item?</h3>
-                            <p className="text-slate-400 text-sm">
-                                ¿Quitar <span className="text-white font-bold">{itemToDelete.name}</span> de la orden?
-                            </p>
+            {
+                itemToDelete && (
+                    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                        <div className="bg-slate-900 w-full max-w-sm rounded-2xl border border-slate-700 shadow-2xl p-6 animate-in zoom-in-95 duration-200">
+                            <div className="flex flex-col items-center text-center gap-4">
+                                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 mb-2">
+                                    <AlertTriangle size={24} />
+                                </div>
+                                <h3 className="text-xl font-bold text-white">¿Eliminar Item?</h3>
+                                <p className="text-slate-400 text-sm">
+                                    ¿Quitar <span className="text-white font-bold">{itemToDelete.name}</span> de la orden?
+                                </p>
 
-                            <div className="flex gap-3 w-full mt-2">
-                                <button
-                                    onClick={() => setItemToDelete(null)}
-                                    className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium transition"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={confirmDelete}
-                                    className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition shadow-lg shadow-red-900/20"
-                                >
-                                    Eliminar
-                                </button>
+                                <div className="flex gap-3 w-full mt-2">
+                                    <button
+                                        onClick={() => setItemToDelete(null)}
+                                        className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium transition"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={confirmDelete}
+                                        className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition shadow-lg shadow-red-900/20"
+                                    >
+                                        Eliminar
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }

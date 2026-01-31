@@ -7,7 +7,7 @@ import { collection, query, where, onSnapshot, deleteDoc, doc } from 'firebase/f
 import { db } from '@/lib/firebase';
 import { User, Role } from '@/lib/types';
 import { createStaffUser } from '@/lib/authHelpers';
-import { Users, UserPlus, X, Check, ChefHat, Utensils, Trash2, AlertTriangle } from 'lucide-react';
+import { Users, UserPlus, X, Check, ChefHat, Utensils, Trash2, AlertTriangle, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function StaffManager() {
@@ -175,10 +175,17 @@ export function StaffManager() {
                                     </div>
                                     <div className="overflow-hidden">
                                         <p className="font-bold text-slate-200 truncate">{member.displayName}</p>
-                                        <div className="flex items-center mt-1">
-                                            <p className="text-xs text-slate-400 font-mono bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 truncate">
-                                                {getDisplayUsername(member.email)}
+                                        <div className="flex flex-col gap-1 mt-1">
+                                            <p className="text-xs text-slate-400 font-mono bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 truncate w-fit">
+                                                User: {getDisplayUsername(member.email || '')}
                                             </p>
+                                            {member.visiblePassword && (
+                                                <div className="flex items-center gap-2 group/pass cursor-pointer" onClick={() => toast.info(`Clave: ${member.visiblePassword}`, { description: 'Recuerda que si el usuario la cambió, esta referencia puede ser antigua.' })}>
+                                                    <p className="text-[10px] text-slate-500 font-mono bg-slate-900/50 px-1.5 py-0.5 rounded border border-slate-800/50 truncate w-fit flex items-center gap-1 hover:text-white transition-colors">
+                                                        Pass: •••••• <Eye size={10} />
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

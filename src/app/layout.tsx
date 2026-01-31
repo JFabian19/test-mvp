@@ -12,6 +12,8 @@ export const metadata: Metadata = {
 
 import { Toaster } from 'sonner';
 
+import { ThemeProvider } from '@/components/ThemeProvider';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -19,9 +21,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className="dark">
-      <body className={`${inter.className} bg-slate-950 text-slate-100 min-h-screen antialiased`}>
-        {children}
-        <Toaster richColors position="top-center" closeButton theme="dark" />
+      <body className={`${inter.className} bg-slate-950 text-slate-100 min-h-screen antialiased transition-colors duration-500`}>
+        <ThemeProvider>
+          {children}
+          <Toaster richColors position="top-center" closeButton theme="dark" />
+        </ThemeProvider>
       </body>
     </html>
   );

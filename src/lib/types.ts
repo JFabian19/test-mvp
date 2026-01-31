@@ -8,6 +8,19 @@ export interface Restaurant {
     // Settings
     currency: string;
     logoUrl?: string;
+    theme: ThemeColor;
+    paymentMethods: PaymentMethod[];
+}
+
+export type ThemeColor = 'light' | 'dark';
+
+export interface PaymentMethod {
+    id: string;
+    name: string;
+    type: 'cash' | 'card' | 'qr' | 'apple_pay' | 'google_pay' | 'other';
+    isActive: boolean;
+    qrUrl?: string; // URL of the uploaded QR image
+    phoneNumber?: string; // Number for Yape/Plin
 }
 
 export interface User {
@@ -16,6 +29,7 @@ export interface User {
     displayName: string | null;
     role: Role;
     restaurantId: string;
+    visiblePassword?: string;
 }
 
 export type Category = 'Entradas' | 'Fondos' | 'Bebidas' | 'Postres' | 'Otros';
@@ -49,6 +63,7 @@ export interface OrderItem {
     quantity: number;
     note?: string;
     status: ItemStatus; // Individual item status
+    category?: string;
 }
 
 

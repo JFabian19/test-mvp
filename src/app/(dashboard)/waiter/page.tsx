@@ -13,24 +13,7 @@ import { db } from '@/lib/firebase';
 import { Order, ItemStatus, OrderItem } from '@/lib/types';
 import { Bell, CheckCircle } from 'lucide-react';
 
-// Simple Toast Component
-function Toast({ message, onClose }: { message: string, onClose: () => void }) {
-    useEffect(() => {
-        const timer = setTimeout(onClose, 5000);
-        return () => clearTimeout(timer);
-    }, [onClose]);
-
-    return (
-        <div className="fixed top-4 right-4 bg-emerald-600 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-5 z-50">
-            <Bell className="animate-bounce" />
-            <div>
-                <p className="font-bold">¡Plato Listo!</p>
-                <p className="text-sm">{message}</p>
-            </div>
-            <button onClick={onClose} className="ml-4 hover:bg-emerald-700 p-1 rounded">✕</button>
-        </div>
-    );
-}
+// Toast Component Removed
 
 export default function WaiterPage() {
     const { user, logout, loading } = useAuth();
@@ -55,12 +38,6 @@ export default function WaiterPage() {
     }, [user, loading, router]);
 
     const [activeOrders, setActiveOrders] = useState<Order[]>([]);
-    const [notifications, setNotifications] = useState<string[]>([]);
-
-    const addNotification = (msg: string) => {
-        setNotifications(prev => [...prev, msg]);
-        // Sound effect could go here
-    };
 
     // RBAC Guard
     // ... existing RBAC ...
@@ -83,8 +60,6 @@ export default function WaiterPage() {
             where('restaurantId', '==', user.restaurantId)
         );
 
-        let previousOrdersMap = new Map<string, Order>();
-
         const unsubOrders = onSnapshot(qOrders, (snapshot) => {
             const allOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
 
@@ -92,42 +67,8 @@ export default function WaiterPage() {
             // We include 'delivered' so they can be paid.
             const visibleOrders = allOrders.filter(o => o.status !== 'completed');
 
-            // Check changes for notifications
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === 'modified' || change.type === 'added') {
-                    const newOrder = change.doc.data() as Order;
-                    // Ignore completed orders for notifications
-                    if (newOrder.status === 'completed') return;
-
-                    const oldOrder = previousOrdersMap.get(newOrder.id);
-
-                    if (oldOrder) {
-                        newOrder.items.forEach(newItem => {
-                            if (newItem.status === 'ready') {
-                                const oldItem = oldOrder.items.find(i => i.id === newItem.id);
-                                // Notify if it wasn't ready before (either didn't exist or wasn't ready)
-                                if (!oldItem || oldItem.status !== 'ready') {
-                                    addNotification(`Mesa ${newOrder.tableNumber}: ${newItem.name} está listo.`);
-                                }
-                            }
-                        });
-                    } else if (change.type === 'added') {
-                        // Initial load or new order, check if any ready? Usually starts pending.
-                        // Can skip notification for initial load if we want.
-                        // For now, only notify if 'ready' and purely new (rare for kitchen to add ready item).
-                    }
-
-                    // Update map
-                    previousOrdersMap.set(newOrder.id, newOrder);
-                }
-            });
-
             // Update state
             setActiveOrders(visibleOrders);
-            // Sync map for initial load or removals
-            if (snapshot.docChanges().length === 0 || snapshot.size !== previousOrdersMap.size) {
-                visibleOrders.forEach(o => previousOrdersMap.set(o.id, o));
-            }
         });
 
         // 3. Fetch Products
@@ -204,16 +145,7 @@ export default function WaiterPage() {
                 />
             </main>
 
-            {/* Notifications */}
-            <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2">
-                {notifications.map((msg, idx) => (
-                    <Toast
-                        key={idx}
-                        message={msg}
-                        onClose={() => setNotifications(prev => prev.filter((_, i) => i !== idx))}
-                    />
-                ))}
-            </div>
+            {/* Notifications Removed */}
 
             {/* Modals */}
             <MenuModal

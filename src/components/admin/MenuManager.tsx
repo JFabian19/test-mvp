@@ -479,15 +479,15 @@ export function MenuManager() {
                                 <div className="border-2 border-dashed border-slate-700 rounded-xl p-10 text-center hover:border-blue-500 transition-colors bg-slate-950/50">
                                     <input
                                         type="file"
-                                        accept="image/*"
+                                        accept="image/*, application/pdf, .csv, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/csv"
                                         onChange={(e) => setScanFile(e.target.files?.[0] || null)}
                                         className="hidden"
                                         id="menu-upload"
                                     />
                                     <label htmlFor="menu-upload" className="cursor-pointer flex flex-col items-center">
                                         <Upload size={48} className="text-slate-500 mb-4" />
-                                        <p className="text-lg font-medium text-slate-300">Sube una foto de tu carta</p>
-                                        <p className="text-sm text-slate-500 mt-2">La IA detectará platos, precios y descripciones.</p>
+                                        <p className="text-lg font-medium text-slate-300">Sube Carta (Foto, PDF, Excel)</p>
+                                        <p className="text-sm text-slate-500 mt-2">La IA leerá el archivo y validará seguridad.</p>
                                     </label>
 
                                     {scanFile && (

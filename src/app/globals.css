@@ -14,7 +14,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #020617; /* slate-950 matched */
+    --background: #020617;
+    /* slate-950 matched */
     --foreground: #ededed;
   }
 }
@@ -38,12 +39,14 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155; /* slate-700 */
+  background: #334155;
+  /* slate-700 */
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569; /* slate-600 */
+  background: #475569;
+  /* slate-600 */
 }
 
 /* Firefox */
@@ -54,15 +57,115 @@ body {
 
 /* Utilities for hiding scrollbar but keeping functionality */
 .no-scrollbar::-webkit-scrollbar {
-    display: none;
+  display: none;
 }
+
 .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Custom Scrollbar class for specific containers if needed */
 .custom-scrollbar::-webkit-scrollbar-track {
-    background: #0f172a; /* slate-900 */
-    border-radius: 4px;
+  background: #0f172a;
+  border-radius: 4px;
+}
+
+/* --- THEMES --- */
+
+/* 1. LIGHT THEME */
+.theme-light {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --popover: #ffffff;
+  --primary: #0f172a;
+  --secondary: #f1f5f9;
+  --muted: #f1f5f9;
+  --accent: #f1f5f9;
+}
+
+.theme-light body {
+  background: #f8fafc !important;
+  /* slate-50 */
+  color: #0f172a !important;
+  /* slate-900 */
+}
+
+/* OVERRIDES FOR TAILWIND UTILITIES IN LIGHT MODE */
+
+/* Backgrounds */
+.theme-light .bg-slate-950,
+.theme-light .bg-black,
+.theme-light .bg-black\/80,
+.theme-light .bg-black\/90 {
+  background-color: #f8fafc !important;
+  /* Main Page BG -> light slate */
+}
+
+.theme-light .bg-slate-900 {
+  background-color: #ffffff !important;
+  /* Cards/Modals -> White */
+  border-color: #e2e8f0 !important;
+  /* light border */
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) !important;
+}
+
+.theme-light .bg-slate-800,
+.theme-light .bg-slate-800\/50,
+.theme-light .bg-slate-950\/50 {
+  background-color: #f1f5f9 !important;
+  /* Secondary elements -> slate-100 */
+  border-color: #cbd5e1 !important;
+}
+
+.theme-light .hover\:bg-slate-700:hover {
+  background-color: #e2e8f0 !important;
+  /* Darker hover */
+}
+
+/* Text Colors */
+.theme-light .text-white,
+.theme-light .text-slate-100,
+.theme-light .text-slate-200 {
+  color: #0f172a !important;
+  /* Invert white/light text to slate-900 */
+}
+
+.theme-light .text-slate-300,
+.theme-light .text-slate-400 {
+  color: #475569 !important;
+  /* Darken grey text to slate-600 for readability */
+}
+
+.theme-light .text-slate-500 {
+  color: #64748b !important;
+  /* slate-500 is roughly okay, but ensure no fade */
+}
+
+/* Borders */
+.theme-light .border-slate-700,
+.theme-light .border-slate-800 {
+  border-color: #cbd5e1 !important;
+  /* slate-300 */
+}
+
+/* Specific Component Fixes */
+.theme-light button.disabled\:opacity-50:disabled {
+  opacity: 0.5 !important;
+  background-color: #e2e8f0 !important;
+  color: #94a3b8 !important;
+}
+
+/* Ensure inputs in light mode are readable */
+.theme-light input,
+.theme-light select,
+.theme-light textarea {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+.theme-light input::placeholder {
+  color: #94a3b8 !important;
 }

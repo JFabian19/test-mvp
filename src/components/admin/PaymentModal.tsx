@@ -14,14 +14,20 @@ interface PaymentModalProps {
     order: Order | null;
 }
 
+import { useRestaurant } from '@/hooks/useRestaurant';
+import { clsx } from 'clsx';
+
 export function PaymentModal({ isOpen, onClose, table, order }: PaymentModalProps) {
+    const { restaurant } = useRestaurant();
     const [loading, setLoading] = useState(false);
-    const [confirmMethod, setConfirmMethod] = useState<'Efectivo' | 'Tarjeta' | 'Yape/Plin' | null>(null);
+    const [confirmMethod, setConfirmMethod] = useState<string | null>(null);
 
     if (!isOpen) return null;
 
-    const handleInitialClick = (method: 'Efectivo' | 'Tarjeta' | 'Yape/Plin') => {
-        setConfirmMethod(method);
+    const activeMethods = restaurant?.paymentMethods?.filter(m => m.isActive) || [];
+
+    const handleInitialClick = (methodName: string) => {
+        setConfirmMethod(methodName);
     };
 
     const confirmPayment = async () => {
@@ -101,48 +107,32 @@ export function PaymentModal({ isOpen, onClose, table, order }: PaymentModalProp
 
                             {/* Payment Methods */}
                             <h3 className="text-sm text-slate-400 mb-3 font-bold uppercase tracking-wider">Seleccionar Método de Pago</h3>
-                            <div className="grid grid-cols-1 gap-3">
-                                <button
-                                    onClick={() => handleInitialClick('Efectivo')}
-                                    disabled={loading}
-                                    className="flex items-center justify-between p-4 bg-slate-800 hover:bg-emerald-900/20 border border-slate-700 hover:border-emerald-500/50 rounded-xl transition-all group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400 group-hover:text-emerald-300">
-                                            <Banknote size={24} />
+                            <div className="grid grid-cols-1 gap-3 max-h-[40vh] overflow-y-auto pr-2">
+                                {activeMethods.map(method => (
+                                    <button
+                                        key={method.id}
+                                        onClick={() => handleInitialClick(method.name)}
+                                        disabled={loading}
+                                        className="flex items-center justify-between p-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-blue-500/50 rounded-xl transition-all group"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={clsx("p-2 rounded-lg text-slate-400 group-hover:text-white",
+                                                method.type === 'cash' ? "bg-emerald-500/10 text-emerald-500" :
+                                                    method.type === 'qr' ? "bg-purple-500/10 text-purple-500" :
+                                                        "bg-blue-500/10 text-blue-500"
+                                            )}>
+                                                {method.type === 'cash' && <Banknote size={24} />}
+                                                {method.type === 'qr' && <Landmark size={24} />}
+                                                {(method.type === 'card' || method.type === 'other') && <CreditCard size={24} />}
+                                            </div>
+                                            <span className="font-bold text-slate-200 group-hover:text-white">{method.name}</span>
                                         </div>
-                                        <span className="font-bold text-slate-200 group-hover:text-white">Efectivo</span>
-                                    </div>
-                                    <span className="text-slate-500 group-hover:text-emerald-400">→</span>
-                                </button>
-
-                                <button
-                                    onClick={() => handleInitialClick('Yape/Plin')}
-                                    disabled={loading}
-                                    className="flex items-center justify-between p-4 bg-slate-800 hover:bg-purple-900/20 border border-slate-700 hover:border-purple-500/50 rounded-xl transition-all group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-purple-500/10 rounded-lg text-purple-400 group-hover:text-purple-300">
-                                            <Landmark size={24} />
-                                        </div>
-                                        <span className="font-bold text-slate-200 group-hover:text-white">Yape / Plin</span>
-                                    </div>
-                                    <span className="text-slate-500 group-hover:text-purple-400">→</span>
-                                </button>
-
-                                <button
-                                    onClick={() => handleInitialClick('Tarjeta')}
-                                    disabled={loading}
-                                    className="flex items-center justify-between p-4 bg-slate-800 hover:bg-blue-900/20 border border-slate-700 hover:border-blue-500/50 rounded-xl transition-all group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400 group-hover:text-blue-300">
-                                            <CreditCard size={24} />
-                                        </div>
-                                        <span className="font-bold text-slate-200 group-hover:text-white">Tarjeta</span>
-                                    </div>
-                                    <span className="text-slate-500 group-hover:text-blue-400">→</span>
-                                </button>
+                                        <span className="text-slate-500 group-hover:text-blue-400">→</span>
+                                    </button>
+                                ))}
+                                {activeMethods.length === 0 && (
+                                    <p className="text-center text-slate-500 py-4">No hay métodos activos.</p>
+                                )}
                             </div>
                         </>
                     )}
@@ -159,12 +149,8 @@ export function PaymentModal({ isOpen, onClose, table, order }: PaymentModalProp
                         </div>
 
                         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-                            <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 
-                                ${confirmMethod === 'Efectivo' ? 'bg-emerald-500/10 text-emerald-500' :
-                                    confirmMethod === 'Tarjeta' ? 'bg-blue-500/10 text-blue-500' : 'bg-purple-500/10 text-purple-500'}`}>
-                                {confirmMethod === 'Efectivo' && <Banknote size={40} />}
-                                {confirmMethod === 'Tarjeta' && <CreditCard size={40} />}
-                                {confirmMethod === 'Yape/Plin' && <Landmark size={40} />}
+                            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 bg-slate-800 text-slate-200 border border-slate-700">
+                                <Banknote size={40} />
                             </div>
 
                             <p className="text-slate-400 mb-2">Monto Total</p>
@@ -179,8 +165,7 @@ export function PaymentModal({ isOpen, onClose, table, order }: PaymentModalProp
                                 onClick={confirmPayment}
                                 disabled={loading}
                                 className={`w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2
-                                    ${confirmMethod === 'Efectivo' ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/20' :
-                                        confirmMethod === 'Tarjeta' ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/20' : 'bg-purple-600 hover:bg-purple-500 shadow-purple-900/20'}`}
+                                    ${confirmMethod ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/20' : 'bg-slate-700'}`}
                             >
                                 {loading ? 'Procesando...' : <><Check size={24} /> Confirmar Pago</>}
                             </button>

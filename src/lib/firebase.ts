@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getAuth, Auth } from "firebase/auth";
 import { getFirestore, Firestore } from "firebase/firestore";
+import { getStorage, FirebaseStorage } from "firebase/storage";
 
 // TODO: Replace with your Firebase project configuration
 // You can get these from the Firebase Console -> Project Settings -> General -> Your apps
@@ -17,6 +18,7 @@ const firebaseConfig = {
 let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
+let storage: FirebaseStorage;
 
 try {
     if (!getApps().length) {
@@ -26,10 +28,11 @@ try {
     }
     auth = getAuth(app);
     db = getFirestore(app);
+    storage = getStorage(app);
 } catch (error) {
     console.error("Firebase initialization error. Make sure you have set up your environment variables.", error);
     // Note: This will likely crash if credentials are strictly required immediately, 
     // but allows the app to build without them.
 }
 
-export { auth, db, firebaseConfig };
+export { auth, db, storage, firebaseConfig };
