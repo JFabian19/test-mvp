@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import * as XLSX from 'xlsx';
 
 export async function POST(req: NextRequest) {
     try {
@@ -74,8 +75,21 @@ export async function POST(req: NextRequest) {
             fileType.includes('excel') ||
             fileType === 'text/plain'
         ) {
-            // Best effort text read
-            const text = new TextDecoder().decode(buffer);
+            let text = "";
+
+            if (fileType.includes('excel') || fileType.includes('spreadsheet') || fileType.includes('officedocument')) {
+                // Parse Excel binary
+                const workbook = XLSX.read(buffer, { type: 'buffer' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                // Convert to array of arrays
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                // Convert to CSV-like text
+                text = jsonData.map((row: any) => Array.isArray(row) ? row.join(",") : row).join("\n");
+            } else {
+                // Fallback for CSV/Plain Text
+                text = new TextDecoder().decode(buffer);
+            }
             promptContent = [{
                 type: "text",
                 text: `You are an expert Menu Digitizer. I will provide raw text content (CSV/Excel/Text).
