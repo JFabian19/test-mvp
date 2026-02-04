@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { X, DollarSign, CreditCard, Smartphone, QrCode } from 'lucide-react';
 import { clsx } from 'clsx';
-import { updateDoc, doc } from 'firebase/firestore';
+import { updateDoc, doc, addDoc, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Order } from '@/lib/types';
 import { toast } from 'sonner';
 
 import { useRestaurant } from '@/hooks/useRestaurant';
+import { useAuth } from '@/hooks/useAuth';
 import { PaymentMethod } from '@/lib/types';
 
 interface PaymentOptionsModalProps {
@@ -20,6 +21,7 @@ interface PaymentOptionsModalProps {
 
 export function PaymentOptionsModal({ isOpen, onClose, currentOrder, total }: PaymentOptionsModalProps) {
     const { restaurant } = useRestaurant();
+    const { user } = useAuth();
     const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [zoomImage, setZoomImage] = useState<string | null>(null);
@@ -30,21 +32,63 @@ export function PaymentOptionsModal({ isOpen, onClose, currentOrder, total }: Pa
     const selectedMethod = activeMethods.find(m => m.id === selectedMethodId);
 
     const handlePayment = async () => {
-        if (!selectedMethod) return;
+        if (!selectedMethod || !restaurant || !user) return;
         setLoading(true);
         try {
-            await updateDoc(doc(db, 'orders', currentOrder.id), {
-                status: 'completed',
+            const receiptCode = `BOL-${Date.now().toString().slice(-4)}-${Math.floor(Math.random() * 1000)}`;
+
+            // 1. Create Receipt (Immutable Record)
+            await addDoc(collection(db, 'receipts'), {
+                restaurantId: restaurant.id,
+                orderId: currentOrder.id,
+                tableNumber: currentOrder.tableNumber,
+                items: currentOrder.items,
+                total: total,
                 paymentMethod: selectedMethod.name,
-                paidAt: Date.now()
+                closedBy: {
+                    uid: user.uid,
+                    name: user.displayName || 'Unknown',
+                    role: user.role
+                },
+                closedAt: Date.now(),
+                code: receiptCode
             });
 
-            await updateDoc(doc(db, 'tables', currentOrder.tableId!), {
-                status: 'free',
-                currentOrderId: null
-            });
+            // 2. Update Order
+            // Si es 'takeout', NO la completamos aún. El usuario debe dar click en "Despachar".
+            // Si es Mesa, sí cerramos la orden y liberamos mesa.
+            const isTakeout = currentOrder.type === 'takeout';
 
-            toast.success(`Pago registrado: ${selectedMethod.name}`, {
+            const updateData: any = {
+                paymentMethod: selectedMethod.name,
+                paidAt: Date.now(),
+                receiptCode: receiptCode
+            };
+
+            if (!isTakeout) {
+                updateData.status = 'completed';
+            } else {
+                // Logic for Takeout:
+                // If "Pay After" (Default): Paying means transaction is done & food handed over -> Complete.
+                // If "Pay Before": Paying means just the start -> Keep open for Kitchen/Dispatch.
+                const timing = restaurant.takeoutPaymentTiming || 'after';
+                if (timing === 'after') {
+                    updateData.status = 'completed';
+                }
+                // If 'before', we do nothing to status (it remains pending/cooking/ready), waiting for manual Dispatch.
+            }
+
+            await updateDoc(doc(db, 'orders', currentOrder.id), updateData);
+
+            // 3. Free Table (Only if NOT takeout)
+            if (!isTakeout && currentOrder.tableId) {
+                await updateDoc(doc(db, 'tables', currentOrder.tableId), {
+                    status: 'free',
+                    currentOrderId: null
+                });
+            }
+
+            toast.success(`Pago exitoso. Boleta: ${receiptCode}`, {
                 description: `Mesa ${currentOrder.tableNumber} liberada.`
             });
             onClose();
@@ -55,6 +99,7 @@ export function PaymentOptionsModal({ isOpen, onClose, currentOrder, total }: Pa
             setLoading(false);
         }
     };
+
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200">

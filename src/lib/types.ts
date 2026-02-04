@@ -10,6 +10,7 @@ export interface Restaurant {
     logoUrl?: string;
     theme: ThemeColor;
     paymentMethods: PaymentMethod[];
+    takeoutPaymentTiming?: 'before' | 'after';
 }
 
 export type ThemeColor = 'light' | 'dark';
@@ -72,11 +73,16 @@ export interface Order {
     restaurantId: string;
     tableId: string;
     tableNumber: string;
+    type?: 'dine-in' | 'takeout';
+    customerName?: string;
     items: OrderItem[];
     status: OrderStatus;
     total: number;
     createdAt: number; // Timestamp
     updatedAt: number;
+    paymentMethod?: string;
+    paidAt?: number;
+    receiptCode?: string;
 }
 
 export type TableStatus = 'free' | 'occupied' | 'paying';
@@ -87,4 +93,21 @@ export interface Table {
     number: string; // e.g., "1", "A1"
     status: TableStatus;
     currentOrderId?: string;
+}
+
+export interface Receipt {
+    id: string;
+    restaurantId: string;
+    orderId: string;
+    tableNumber: string;
+    items: OrderItem[];
+    total: number;
+    paymentMethod: string;
+    closedBy: {
+        uid: string;
+        name: string; // "Admin", "Juan", etc.
+        role: Role;
+    };
+    closedAt: number;
+    code: string; // Unique short code e.g. "B-1234AB"
 }

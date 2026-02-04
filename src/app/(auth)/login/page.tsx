@@ -10,6 +10,7 @@ import { UtensilsCrossed, ChefHat, ArrowRight, Loader2 } from 'lucide-react';
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [rememberMe, setRememberMe] = useState(true); // Default to true
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const router = useRouter();
@@ -20,6 +21,12 @@ export default function LoginPage() {
         setError('');
 
         try {
+            // Set persistence based on checkbox
+            // Import these dynamically or at top if possible, but for clean edit:
+            const { setPersistence, browserLocalPersistence, browserSessionPersistence } = await import('firebase/auth');
+
+            await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+
             // Auto-append domain if simple username provided
             const emailToUse = email.includes('@') ? email : `${email}@restaurante.app`;
 
@@ -103,6 +110,28 @@ export default function LoginPage() {
                             className="w-full p-3.5 rounded-xl bg-slate-950 border border-slate-700/50 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all placeholder:text-slate-600 text-slate-200"
                             required
                         />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-2 cursor-pointer group">
+                            <div className="relative">
+                                <input
+                                    type="checkbox"
+                                    checked={rememberMe}
+                                    onChange={(e) => setRememberMe(e.target.checked)}
+                                    className="peer sr-only"
+                                />
+                                <div className="w-5 h-5 border-2 border-slate-600 rounded bg-slate-900 peer-checked:bg-orange-600 peer-checked:border-orange-600 transition-all flex items-center justify-center">
+                                    <svg className="w-3.5 h-3.5 text-white scale-0 peer-checked:scale-100 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                            </div>
+                            <span className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">Mantener sesión iniciada</span>
+                        </label>
+                        <a href="#" className="text-sm text-orange-500 hover:text-orange-400 font-medium transition-colors">
+                            ¿Olvidaste tu contraseña?
+                        </a>
                     </div>
 
                     <button

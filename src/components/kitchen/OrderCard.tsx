@@ -2,7 +2,7 @@
 
 import { Order, OrderItem, ItemStatus } from '@/lib/types';
 import { clsx } from 'clsx';
-import { Clock, CheckCircle, ChefHat, Utensils, Bell } from 'lucide-react';
+import { Clock, CheckCircle, ChefHat, Utensils, Bell, ShoppingBag } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface OrderCardProps {
@@ -52,7 +52,21 @@ export function OrderCard({ order, onUpdateItemStatus, onMarkAllReady }: OrderCa
             <div>
                 <div className="flex justify-between items-start mb-4 border-b border-slate-700 pb-2">
                     <div>
-                        <h3 className="text-xl font-bold text-white">Mesa {order.tableNumber}</h3>
+                        {order.type === 'takeout' ? (
+                            <div className="flex items-center gap-2">
+                                <span className="bg-orange-500 text-white p-1 rounded-md">
+                                    <ShoppingBag size={18} />
+                                </span>
+                                <div>
+                                    <h3 className="text-xl font-bold text-white max-w-[150px] truncate" title={order.customerName}>
+                                        {order.customerName || 'Para Llevar'}
+                                    </h3>
+                                    <span className="text-xs text-orange-400 font-bold uppercase tracking-wider">Takeout</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <h3 className="text-xl font-bold text-white">Mesa {order.tableNumber}</h3>
+                        )}
                         <span className="text-xs text-slate-400">#{order.id.slice(-4)}</span>
                     </div>
                     <div className={clsx("flex items-center gap-1 font-bold", isLate ? "text-red-500" : "text-slate-400")}>

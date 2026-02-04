@@ -8,9 +8,11 @@ import { PaymentModal } from '@/components/admin/PaymentModal';
 import { StaffManager } from '@/components/admin/StaffManager';
 import { MenuManager } from '@/components/admin/MenuManager';
 import { TableSetup } from '@/components/admin/TableSetup';
+import { SalesHistory } from '@/components/admin/SalesHistory';
 import { SalesReports } from '@/components/admin/SalesReports';
 import { RestaurantSettings } from '@/components/admin/RestaurantSettings';
-import { LogOut, LayoutDashboard, Users, Utensils, BarChart3, Grid, Settings } from 'lucide-react';
+import { TakeoutManager } from '@/components/waiter/TakeoutManager';
+import { LogOut, LayoutDashboard, Users, Utensils, BarChart3, Grid, Settings, FileText, ShoppingBag, Store } from 'lucide-react';
 import { collection, onSnapshot, query, doc, getDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Table, Order, Product } from '@/lib/types';
@@ -22,10 +24,13 @@ export default function AdminPage() {
     const { user, logout } = useAuth();
     const { restaurant } = useRestaurant();
     const [tables, setTables] = useState<Table[]>([]);
-    const [activeTab, setActiveTab] = useState<'tables' | 'staff' | 'menu' | 'reports' | 'settings'>('tables');
+    const [activeTab, setActiveTab] = useState<'areas' | 'staff' | 'menu' | 'reports' | 'settings' | 'history'>('areas');
+    const [activeAreaTab, setActiveAreaTab] = useState<'dine-in' | 'takeout'>('dine-in');
 
     // Table/Payment State
-    const [selectedTable, setSelectedTable] = useState<Table | null>(null);
+    const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+    const selectedTable = tables.find(t => t.id === selectedTableId) || null;
+
     const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
     const [isPaymentOpen, setIsPaymentOpen] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -83,10 +88,10 @@ export default function AdminPage() {
         });
 
         return () => unsub();
-    }, [selectedTable?.currentOrderId]); // Re-run when table's order ID changes
+    }, [selectedTable?.currentOrderId, selectedTableId]); // Re-run when table's order ID changes
 
     const handleTableSelect = (table: Table) => {
-        setSelectedTable(table);
+        setSelectedTableId(table.id);
         clearCart();
         // Listener mechanism above handles fetching the order and opening the modal
     };
@@ -164,10 +169,10 @@ export default function AdminPage() {
                 {/* Tabs Navigation */}
                 <div className="flex overflow-x-auto pb-2 gap-2 border-b border-slate-800">
                     <TabButton
-                        active={activeTab === 'tables'}
-                        onClick={() => setActiveTab('tables')}
-                        icon={<Grid size={18} />}
-                        label="Mesas"
+                        active={activeTab === 'areas'}
+                        onClick={() => setActiveTab('areas')}
+                        icon={<Store size={18} />}
+                        label="Áreas"
                     />
                     <TabButton
                         active={activeTab === 'staff'}
@@ -179,7 +184,13 @@ export default function AdminPage() {
                         active={activeTab === 'menu'}
                         onClick={() => setActiveTab('menu')}
                         icon={<Utensils size={18} />}
-                        label="Menú / Carta"
+                        label="Menú"
+                    />
+                    <TabButton
+                        active={activeTab === 'history'}
+                        onClick={() => setActiveTab('history')}
+                        icon={<FileText size={18} />}
+                        label="Boletas"
                     />
                     <TabButton
                         active={activeTab === 'reports'}
@@ -197,36 +208,60 @@ export default function AdminPage() {
 
                 {/* Tab Views */}
                 <div className="flex-1">
-                    {activeTab === 'tables' && (
-                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-xl font-bold text-white">Estado del Salón</h2>
+                    {activeTab === 'areas' && (
+                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 flex flex-col gap-4">
+                            {/* Sub-tabs for Areas */}
+                            <div className="flex gap-2 bg-slate-900/50 p-1 rounded-lg self-start border border-slate-800">
                                 <button
-                                    onClick={() => setIsEditingTables(true)}
-                                    className="text-sm text-blue-400 hover:text-blue-300 underline"
+                                    onClick={() => setActiveAreaTab('dine-in')}
+                                    className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${activeAreaTab === 'dine-in' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
                                 >
-                                    {tables.length > 0 ? 'Configurar Mesas' : ''}
+                                    <Grid size={16} />
+                                    Salón (Mesas)
+                                </button>
+                                <button
+                                    onClick={() => setActiveAreaTab('takeout')}
+                                    className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${activeAreaTab === 'takeout' ? 'bg-orange-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+                                >
+                                    <ShoppingBag size={16} />
+                                    Para Llevar
                                 </button>
                             </div>
 
-                            {isEditingTables ? (
-                                <TableSetup
-                                    currentCount={tables.length}
-                                    onSave={handleUpdateTableCount}
-                                    onCancel={() => setIsEditingTables(false)}
-                                />
-                            ) : tables.length === 0 ? (
-                                <div className="text-center py-20 text-slate-500 bg-slate-900/50 rounded-xl border border-dashed border-slate-800">
-                                    <p className="mb-4">No tienes mesas configuradas.</p>
-                                    <button
-                                        onClick={() => setIsEditingTables(true)}
-                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition"
-                                    >
-                                        Crear Mesas
-                                    </button>
-                                </div>
+                            {activeAreaTab === 'dine-in' ? (
+                                <>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h2 className="text-xl font-bold text-white">Estado del Salón</h2>
+                                        <button
+                                            onClick={() => setIsEditingTables(true)}
+                                            className="text-sm text-blue-400 hover:text-blue-300 underline"
+                                        >
+                                            {tables.length > 0 ? 'Configurar Mesas' : ''}
+                                        </button>
+                                    </div>
+
+                                    {isEditingTables ? (
+                                        <TableSetup
+                                            currentCount={tables.length}
+                                            onSave={handleUpdateTableCount}
+                                            onCancel={() => setIsEditingTables(false)}
+                                        />
+                                    ) : tables.length === 0 ? (
+                                        <div className="text-center py-20 text-slate-500 bg-slate-900/50 rounded-xl border border-dashed border-slate-800">
+                                            <p className="mb-4">No tienes mesas configuradas.</p>
+                                            <button
+                                                onClick={() => setIsEditingTables(true)}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition"
+                                            >
+                                                Crear Mesas
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <TableGrid tables={tables} onSelectTable={handleTableSelect} />
+                                    )}
+                                </>
                             ) : (
-                                <TableGrid tables={tables} onSelectTable={handleTableSelect} />
+                                <TakeoutManager />
                             )}
                         </div>
                     )}
@@ -240,6 +275,12 @@ export default function AdminPage() {
                     {activeTab === 'menu' && (
                         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                             <MenuManager />
+                        </div>
+                    )}
+
+                    {activeTab === 'history' && (
+                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <SalesHistory />
                         </div>
                     )}
 
@@ -261,7 +302,7 @@ export default function AdminPage() {
             {selectedTable && (
                 <PaymentModal
                     isOpen={isPaymentOpen}
-                    onClose={() => { setIsPaymentOpen(false); setSelectedTable(null); setCurrentOrder(null); }}
+                    onClose={() => { setIsPaymentOpen(false); setSelectedTableId(null); setCurrentOrder(null); }}
                     table={selectedTable}
                     order={currentOrder}
                 />
@@ -270,7 +311,7 @@ export default function AdminPage() {
             {/* Admin-Waiter Menu Modal */}
             <MenuModal
                 isOpen={isMenuOpen}
-                onClose={() => { setIsMenuOpen(false); setSelectedTable(null); setCurrentOrder(null); }}
+                onClose={() => { setIsMenuOpen(false); setSelectedTableId(null); setCurrentOrder(null); }}
                 products={products}
                 currentTableId={selectedTable?.id || null}
                 activeOrder={currentOrder}

@@ -3,26 +3,26 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { Table, Product } from '@/lib/types';
+import { Table, Product, Order } from '@/lib/types';
 import { TableGrid } from '@/components/waiter/TableGrid';
-import { MenuModal } from '@/components/waiter/MenuModal';
-import { LogOut } from 'lucide-react';
-import { useStore } from '@/store/useStore';
+import { MenuModal } from '@/components/waiter/MenuModal'; // Used globally for dine-in
+import { TakeoutManager } from '@/components/waiter/TakeoutManager';
+import { LogOut, Grid, ShoppingBag } from 'lucide-react';
 import { collection, onSnapshot, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Order, ItemStatus, OrderItem } from '@/lib/types';
-import { Bell, CheckCircle } from 'lucide-react';
-
-// Toast Component Removed
+import { clsx } from 'clsx';
 
 export default function WaiterPage() {
     const { user, logout, loading } = useAuth();
     const router = useRouter();
 
+    const [activeTab, setActiveTab] = useState<'dine-in' | 'takeout'>('dine-in');
+
     const [tables, setTables] = useState<Table[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
     const [selectedTable, setSelectedTable] = useState<Table | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [activeOrders, setActiveOrders] = useState<Order[]>([]);
 
     // RBAC Guard
     useEffect(() => {
@@ -37,12 +37,7 @@ export default function WaiterPage() {
         }
     }, [user, loading, router]);
 
-    const [activeOrders, setActiveOrders] = useState<Order[]>([]);
-
-    // RBAC Guard
-    // ... existing RBAC ...
-
-    // Firestore listeners
+    // Firestore listeners (Tables & Orders for Dine-In)
     useEffect(() => {
         if (!user?.restaurantId) return;
 
@@ -54,26 +49,21 @@ export default function WaiterPage() {
         });
 
         // 2. Listen to Active Orders (for progress & notifications)
-        // Fetch ALL non-archived orders to avoid index issues. Client-side filtering is safer for MVP.
         const qOrders = query(
             collection(db, 'orders'),
-            where('restaurantId', '==', user.restaurantId)
+            where('restaurantId', '==', user.restaurantId),
+            where('status', 'in', ['pending', 'cooking', 'ready', 'delivered'])
         );
 
         const unsubOrders = onSnapshot(qOrders, (snapshot) => {
             const allOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
-
-            // Filter out completed/paid orders for the UI
-            // We include 'delivered' so they can be paid.
+            // Visible Dine-In Orders
             const visibleOrders = allOrders.filter(o => o.status !== 'completed');
-
-            // Update state
             setActiveOrders(visibleOrders);
         });
 
         // 3. Fetch Products
         const fetchProducts = async () => {
-            // ... existing fetch ...
             const qProd = query(collection(db, 'products'), where('active', '==', true), where('restaurantId', '==', user.restaurantId));
             const snap = await getDocs(qProd);
             setProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
@@ -105,49 +95,65 @@ export default function WaiterPage() {
         return { progress, order };
     };
 
-    const handleItemDelivered = async (orderId: string, itemId: string) => {
-        // Find order
-        const order = activeOrders.find(o => o.id === orderId);
-        if (!order) return;
-
-        const updatedItems = order.items.map(i => {
-            if (i.id === itemId) return { ...i, status: 'delivered' as ItemStatus };
-            return i;
-        });
-
-        const allDelivered = updatedItems.every(i => i.status === 'delivered');
-
-        await updateDoc(doc(db, 'orders', orderId), {
-            items: updatedItems,
-            status: allDelivered ? 'delivered' : order.status
-        });
-    };
-
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 pb-20">
+        <div className="min-h-screen bg-slate-950 text-slate-100 pb-20 flex flex-col">
             {/* Header */}
-            <header className="fixed top-0 left-0 right-0 z-10 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 p-4 flex justify-between items-center shadow-md">
-                <h1 className="text-xl font-bold text-orange-500">Mesero View</h1>
-                <div className="flex items-center gap-3">
-                    <span className="text-sm text-slate-400 hidden sm:block">{user?.email}</span>
-                    <button onClick={logout} className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition">
-                        <LogOut size={20} />
-                    </button>
+            <header className="fixed top-0 left-0 right-0 z-10 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 p-3 shadow-md">
+                <div className="container mx-auto flex justify-between items-center">
+                    <h1 className="text-xl font-bold text-orange-500">Mesero Panel</h1>
+                    <div className="flex items-center gap-3">
+                        <span className="text-sm text-slate-400 hidden sm:block">{user?.email}</span>
+                        <button onClick={logout} className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition">
+                            <LogOut size={20} />
+                        </button>
+                    </div>
                 </div>
             </header>
 
-            <main className="pt-24 px-4 container mx-auto">
-                <h2 className="text-2xl font-bold mb-6 text-white pl-2 border-l-4 border-orange-500">Salón Principal</h2>
-                <TableGrid
-                    tables={tables}
-                    onSelectTable={handleTableSelect}
-                    getTableStatus={getTableStatus}
-                />
+            <main className="flex-1 pt-20 px-4 container mx-auto">
+                {/* Tabs */}
+                <div className="flex justify-center mb-6">
+                    <div className="bg-slate-900/50 p-1 rounded-xl border border-slate-800 backdrop-blur-sm flex">
+                        <button
+                            onClick={() => setActiveTab('dine-in')}
+                            className={clsx(
+                                "flex items-center gap-2 px-6 py-2 rounded-lg font-bold transition-all",
+                                activeTab === 'dine-in' ? "bg-orange-600 text-white shadow-lg" : "text-slate-400 hover:text-white"
+                            )}
+                        >
+                            <Grid size={18} />
+                            Salón
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('takeout')}
+                            className={clsx(
+                                "flex items-center gap-2 px-6 py-2 rounded-lg font-bold transition-all",
+                                activeTab === 'takeout' ? "bg-orange-600 text-white shadow-lg" : "text-slate-400 hover:text-white"
+                            )}
+                        >
+                            <ShoppingBag size={18} />
+                            Para Llevar
+                        </button>
+                    </div>
+                </div>
+
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    {activeTab === 'dine-in' ? (
+                        <>
+                            <h2 className="text-xl font-bold mb-4 text-white pl-2 border-l-4 border-orange-500">Mesas</h2>
+                            <TableGrid
+                                tables={tables}
+                                onSelectTable={handleTableSelect}
+                                getTableStatus={getTableStatus}
+                            />
+                        </>
+                    ) : (
+                        <TakeoutManager />
+                    )}
+                </div>
             </main>
 
-            {/* Notifications Removed */}
-
-            {/* Modals */}
+            {/* Menu Modal (Only for Dine-In logic here, TakeoutManager has its own) */}
             <MenuModal
                 isOpen={isMenuOpen}
                 onClose={() => setIsMenuOpen(false)}

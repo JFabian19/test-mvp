@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Product, Order, ItemStatus } from '@/lib/types';
+import { Product, Order, ItemStatus, OrderItem } from '@/lib/types';
 import { X, Plus, Trash2, Send, CheckCircle, Clock, ChefHat, Bell, DollarSign, AlertTriangle } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useStore } from '@/store/useStore';
@@ -16,6 +16,7 @@ interface MenuModalProps {
     products: Product[];
     currentTableId: string | null;
     activeOrder: Order | null;
+    onTakeoutSubmit?: (items: OrderItem[]) => void; // Optional callback for Takeout mode
 }
 
 const statusConfig: Record<ItemStatus, { color: string, icon: any, label: string }> = {
@@ -25,7 +26,7 @@ const statusConfig: Record<ItemStatus, { color: string, icon: any, label: string
     delivered: { color: 'text-emerald-500', icon: CheckCircle, label: 'Entregado' }
 };
 
-export function MenuModal({ isOpen, onClose, products, currentTableId, activeOrder }: MenuModalProps) {
+export function MenuModal({ isOpen, onClose, products, currentTableId, activeOrder, onTakeoutSubmit }: MenuModalProps) {
     const { cart, addToCart, removeFromCart, clearCart, updateCartItemNote } = useStore();
     const [activeCategory, setActiveCategory] = useState<string>('Entradas');
     const [sending, setSending] = useState(false);
@@ -55,7 +56,10 @@ export function MenuModal({ isOpen, onClose, products, currentTableId, activeOrd
 
     // Handlers
     const handleSendOrder = async () => {
-        if (!currentTableId || cart.length === 0) return;
+        // Validation: If NOT takeout, tableId is required
+        if (!onTakeoutSubmit && !currentTableId) return;
+        if (cart.length === 0) return;
+
         setSending(true);
 
         try {
@@ -70,6 +74,14 @@ export function MenuModal({ isOpen, onClose, products, currentTableId, activeOrd
                 category: item.category
             }));
 
+            // Handle Takeout Mode via Callback
+            if (onTakeoutSubmit) {
+                await onTakeoutSubmit(newItems); // Await in case parent does async work
+                clearCart();
+                return; // Stop here, parent handles the rest
+            }
+
+            // Normal Dine-In Flow
             if (activeOrder) {
                 // Append to existing
                 const updatedItems = [...activeOrder.items, ...newItems];
@@ -83,6 +95,8 @@ export function MenuModal({ isOpen, onClose, products, currentTableId, activeOrd
                 });
             } else {
                 // Create New
+                if (!currentTableId) throw new Error("Table ID missing for dine-in");
+
                 const tableSnap = await getDoc(doc(db, 'tables', currentTableId));
                 if (!tableSnap.exists()) throw new Error("Table not found");
                 const tableData = tableSnap.data();

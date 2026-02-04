@@ -17,7 +17,7 @@ export function MenuManager() {
 
     // Scan State
     const [isScanModalOpen, setIsScanModalOpen] = useState(false);
-    const [scanFile, setScanFile] = useState<File | null>(null);
+    const [scanFiles, setScanFiles] = useState<File[]>([]);
     const [isScanning, setIsScanning] = useState(false);
     const [scannedItems, setScannedItems] = useState<Partial<Product>[]>([]);
     const [isSaving, setIsSaving] = useState(false);
@@ -58,30 +58,55 @@ export function MenuManager() {
         return () => unsub();
     }, [user?.restaurantId]);
 
+    // Cleanup scan data on close
+    const handleCloseScanModal = () => {
+        setIsScanModalOpen(false);
+        setScanFiles([]);
+        setScannedItems([]);
+    };
+
     // --- AI SCAN LOGIC ---
     const handleScan = async () => {
-        if (!scanFile) return;
+        if (scanFiles.length === 0) return;
         setIsScanning(true);
 
-        const formData = new FormData();
-        formData.append('file', scanFile);
+        const allItems: Partial<Product>[] = [];
 
         try {
-            const res = await fetch('/api/scan-menu', {
-                method: 'POST',
-                body: formData
-            });
-            const data = await res.json();
+            // Process files sequentially to avoid overwhelming the server/rate limits
+            for (const file of scanFiles) {
+                const formData = new FormData();
+                formData.append('file', file);
 
-            if (data.error) {
-                toast.error('Error: ' + data.error);
-            } else {
-                setScannedItems(data.items);
-                toast.success('Menú escaneado correctamente');
+                try {
+                    const res = await fetch('/api/scan-menu', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await res.json();
+
+                    if (!data.error && data.items) {
+                        allItems.push(...data.items);
+                    } else {
+                        console.error('Error scanning file:', file.name, data.error);
+                        toast.error(`Error en archivo ${file.name}: ${data.error}`);
+                    }
+                } catch (err) {
+                    console.error('Req error:', err);
+                    toast.error(`Error de red con archivo ${file.name}`);
+                }
             }
+
+            if (allItems.length > 0) {
+                setScannedItems(prev => [...prev, ...allItems]);
+                toast.success(`Se encontraron ${allItems.length} productos nuevos.`);
+            } else {
+                toast.warning('No se pudieron extraer productos.');
+            }
+
         } catch (e) {
             console.error(e);
-            toast.error('Error al escanear menú');
+            toast.error('Error general al escanear');
         } finally {
             setIsScanning(false);
         }
@@ -108,9 +133,7 @@ export function MenuManager() {
             });
 
             await Promise.all(promises);
-            setIsScanModalOpen(false);
-            setScannedItems([]);
-            setScanFile(null);
+            handleCloseScanModal(); // Use the cleanup function
             toast.success('¡Productos importados exitosamente!');
         } catch (e) {
             console.error(e);
@@ -471,34 +494,74 @@ export function MenuManager() {
                                 <Sparkles className="text-purple-400" />
                                 Escanear Menú con IA
                             </h3>
-                            <button onClick={() => setIsScanModalOpen(false)}><X className="text-slate-400" /></button>
+                            <button onClick={handleCloseScanModal}><X className="text-slate-400 hover:text-white transition" /></button>
                         </div>
 
                         <div className="p-6 space-y-6 flex-1">
                             {!scannedItems.length ? (
-                                <div className="border-2 border-dashed border-slate-700 rounded-xl p-10 text-center hover:border-blue-500 transition-colors bg-slate-950/50">
-                                    <input
-                                        type="file"
-                                        accept="image/*, application/pdf, .csv, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/csv"
-                                        onChange={(e) => setScanFile(e.target.files?.[0] || null)}
-                                        className="hidden"
-                                        id="menu-upload"
-                                    />
-                                    <label htmlFor="menu-upload" className="cursor-pointer flex flex-col items-center">
-                                        <Upload size={48} className="text-slate-500 mb-4" />
-                                        <p className="text-lg font-medium text-slate-300">Sube Carta (Foto, PDF, Excel)</p>
-                                        <p className="text-sm text-slate-500 mt-2">La IA leerá el archivo y validará seguridad.</p>
-                                    </label>
+                                <div className="space-y-6">
+                                    <div className="border-2 border-dashed border-slate-700 rounded-xl p-10 text-center hover:border-blue-500 transition-colors bg-slate-950/50">
+                                        <input
+                                            type="file"
+                                            multiple
+                                            accept="image/*, application/pdf" // Removed excel/csv based on prompt "sube tus imagenes", keeping PDF as it is supported by route
+                                            onChange={(e) => {
+                                                const files = Array.from(e.target.files || []);
+                                                if (files.length + scanFiles.length > 5) {
+                                                    toast.error("Máximo 5 archivos permitidos.");
+                                                    return;
+                                                }
+                                                setScanFiles(prev => [...prev, ...files].slice(0, 5));
+                                            }}
+                                            className="hidden"
+                                            id="menu-upload"
+                                        />
+                                        <label htmlFor="menu-upload" className="cursor-pointer flex flex-col items-center">
+                                            <Upload size={48} className="text-slate-500 mb-4" />
+                                            <p className="text-lg font-medium text-slate-300">Sube tus imágenes (Máx 5)</p>
+                                            <p className="text-sm text-slate-500 mt-2">Fotos claras del menú o archivos PDF.</p>
+                                        </label>
+                                    </div>
 
-                                    {scanFile && (
-                                        <div className="mt-6 bg-slate-800 p-4 rounded-lg flex items-center justify-between">
-                                            <span className="text-sm text-slate-300 truncate">{scanFile.name}</span>
+                                    {/* File List */}
+                                    {scanFiles.length > 0 && (
+                                        <div className="space-y-3">
+                                            <h4 className="text-sm font-bold text-slate-400">Archivos seleccionados ({scanFiles.length}/5):</h4>
+                                            <div className="space-y-2">
+                                                {scanFiles.map((file, idx) => (
+                                                    <div key={idx} className="bg-slate-800 p-3 rounded-lg flex items-center justify-between border border-slate-700">
+                                                        <div className="flex items-center gap-3 overflow-hidden">
+                                                            <div className="bg-slate-700 p-1.5 rounded text-xs font-bold uppercase text-slate-300">
+                                                                {file.name.split('.').pop()}
+                                                            </div>
+                                                            <span className="text-sm text-slate-200 truncate max-w-[200px]">{file.name}</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => setScanFiles(prev => prev.filter((_, i) => i !== idx))}
+                                                            className="p-1 hover:bg-slate-700 rounded text-slate-400 hover:text-red-400 transition"
+                                                        >
+                                                            <X size={16} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+
                                             <button
                                                 onClick={handleScan}
-                                                disabled={isScanning}
-                                                className="bg-purple-600 px-4 py-2 rounded-lg text-white font-bold text-sm disabled:opacity-50"
+                                                disabled={isScanning || scanFiles.length === 0}
+                                                className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-3 rounded-xl text-white font-bold text-base shadow-lg transition-all active:scale-[0.99] flex justify-center items-center gap-2 mt-4"
                                             >
-                                                {isScanning ? 'Analizando...' : 'Procesar Imagen'}
+                                                {isScanning ? (
+                                                    <>
+                                                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                        Analizando archivos...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Sparkles size={20} />
+                                                        Dar click para analizar
+                                                    </>
+                                                )}
                                             </button>
                                         </div>
                                     )}
